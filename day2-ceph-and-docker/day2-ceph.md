@@ -6437,7 +6437,7 @@ LISTEN   0         100                    [::]:25                  [::]:*
 
 ##### 8.5.2.4 验证访问
 
-![rados-https](./img/rados-https.png)
+![radosgw-https](./img/radosgw-https.png)
 
 注:mac chrome不安全页面,盲敲thisisunsafe即可访问
 

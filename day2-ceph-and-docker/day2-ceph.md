@@ -5785,6 +5785,8 @@ standby_count_wanted	1
 [mds.ceph-mon-1{1:66414} state up:active seq 15 addr [v2:192.168.0.165:6800/1975831234,v1:192.168.0.165:6801/1975831234] compat {c=[1],r=[1],i=[7ff]}]
 ```
 
+查看集群mds状态:
+
 ```
 ceph@ceph-deploy-1:~/ceph-cluster$ ceph mds stat
 mycephfs:2 {0=ceph-mgr-1=up:active,1=ceph-mon-1=up:active} 2 up:standby

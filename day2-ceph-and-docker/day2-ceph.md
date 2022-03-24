@@ -5465,7 +5465,8 @@ MDS version: ceph version 16.2.7 (dd0603118f56ab514f133c8d2e3adfc983942503) paci
 
 ```
 ceph@ceph-deploy-1:~$ ceph auth add client.user4 mon 'allow r' mds 'allow rw' osd 'allow rwx pool=cephfs-data'
-added key for client.user4```
+added key for client.user4
+```
 
 - step2. 验证账户
 

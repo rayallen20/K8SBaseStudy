@@ -1,4 +1,4 @@
-# day2
+# day2-ceph
 
 ## PART1. ceph集群应用基础
 

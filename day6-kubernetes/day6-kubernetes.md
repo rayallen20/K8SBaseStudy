@@ -2799,7 +2799,7 @@ root@k8s-master-1:~# bash scp-key.sh
 		kubernetes-dashboard   kubernetes-dashboard-54d6cc67d5-ckwj9       1/1     Running   0          22s
 		```
 		
-		![k8s-dashboard](./img/k8s-dashboard.png)
+![k8s-dashboard](./img/k8s-dashboard.png)
 		
 		注意:必须以https协议访问.且此时需要token
 
@@ -2850,4 +2850,4 @@ root@k8s-master-1:~# bash scp-key.sh
 		namespace:  20 bytes
 		```
 		
-		![k8s-dashboard-登录后](./img/k8s-dashboard-登录后.png)
+![k8s-dashboard-登录后](./img/k8s-dashboard-登录后.png)

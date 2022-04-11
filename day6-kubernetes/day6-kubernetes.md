@@ -2708,8 +2708,6 @@ root@k8s-master-1:~# bash scp-key.sh
 		--- www.baidu.com ping statistics ---
 		2 packets transmitted, 2 packets received, 0% packet loss
 		```
-
-		![普罗米修斯的mertics数据](./img/普罗米修斯的mertics数据.png)
 		
 	- step4.17 安装dashboard
 	
@@ -2849,5 +2847,7 @@ root@k8s-master-1:~# bash scp-key.sh
 		ca.crt:     1350 bytes
 		namespace:  20 bytes
 		```
+
+![普罗米修斯的mertics数据](./img/普罗米修斯的mertics数据.png)
 		
 ![k8s-dashboard-登录后](./img/k8s-dashboard-登录后.png)

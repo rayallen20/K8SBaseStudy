@@ -2670,7 +2670,7 @@ root@k8s-master-1:~# bash scp-key.sh
 		    protocol: TCP 
 		    targetPort: 9153
 		    nodePort: 30009
-	```
+		```
 
 		- 创建pod并查看
 		

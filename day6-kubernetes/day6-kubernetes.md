@@ -1,4 +1,4 @@
-# day6-kubernetes草记
+# day6-kubernetes
 
 ## 云原生简介
 

@@ -913,7 +913,7 @@ Successfully installed MarkupSafe-1.1.1 PyYAML-5.4.1 ansible-4.10.0 ansible-core
 
 ```
 root@k8s-master-1:~# apt install sshpass -y
-root@k8s-master-1:~# vit scp-key.sh
+root@k8s-master-1:~# vim scp-key.sh
 root@k8s-master-1:~# cat scp-key.sh 
 #!/bin/bash
 

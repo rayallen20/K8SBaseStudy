@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ng-deploy-80
+  template:
+    metadata:
+      labels:
+        app: ng-deploy-80
+    spec:
+      containers:
+      - name: ng-deploy-80
+        image: harbor.k8s.com/erp/nginx:1.16.1 
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - mountPath: /usr/share/nginx/html/mysite
+          name: erp-nfs-volume
+        - mountPath: /usr/share/nginx/html/js
+          name: erp-nfs-js
+      volumes:
+      - name: erp-nfs-volume
+        nfs:
+          server: 172.16.1.189
+          path: /data/erp/mysite
+      - name: erp-nfs-js
+        nfs:
+          server: 172.16.1.189
+          path: /data/erp/js
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ng-deploy-80
+spec:
+  ports:
+  - name: http
+    port: 81
+    targetPort: 80
+    nodePort: 30016
+    protocol: TCP
+  type: NodePort
+  selector:
+    app: ng-deploy-80

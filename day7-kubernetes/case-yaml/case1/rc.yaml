@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: ng-rc
+spec:
+  replicas: 2
+  selector:
+    app: ng-rc-80
+  template:
+    metadata:
+      # labels的内容要和spec.selector的完全相同
+      labels:
+        app: ng-rc-80
+    spec:
+      # 通过containers部分创建的容器 会继承template.label
+      containers:
+        - name: ng-rc-80
+          image: harbor.k8s.com/erp/nginx:1.16.1
+          ports:
+            - containerPort: 80

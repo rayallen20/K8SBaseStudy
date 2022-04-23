@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: frontend
+spec:
+  replicas: 2
+  selector:
+    # ReplicaSet控制器的标签匹配多了一层matchLabels
+    matchLabels:
+      app: ng-rs-80
+    # ReplicaSet支持正则匹配和in notin匹配 但由于匹配的范围过大 因此很少使用
+    # matchExpressions:
+      # 以如下的In匹配为例 假设服务A的label为 app: ng-rs-80,服务B的label为 app: ng-rs-81
+      # 则按照如下方式管理pod,表示服务A的pod和服务B的pod加起来的副本数为2 这样范围就过于宽泛了
+      # - {key: app, operator: In, values: [ng-rs-80,ng-rs-81]}
+  template:
+    metadata:
+      labels:
+        app: ng-rs-80
+    spec:
+      containers:
+      - name: ng-rs-80
+        image: harbor.k8s.com/erp/nginx:1.16.1
+        ports:
+          - containerPort: 80

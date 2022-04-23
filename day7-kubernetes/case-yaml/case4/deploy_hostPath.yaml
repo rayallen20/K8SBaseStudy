@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ng-deploy-80
+  template:
+    metadata:
+      labels:
+        app: ng-deploy-80
+    spec:
+      containers:
+        - name: ng-deploy-80
+          image: harbor.k8s.com/erp/nginx:1.16.1
+          ports:
+          - containerPort: 80
+          volumeMounts:
+          - mountPath: /data/erp
+            name: cache-erp-volume
+      volumes:
+        - name: cache-erp-volume
+          hostPath:
+            # 此处若宿主机没有该目录 会自动创建
+            path: /opt/erp

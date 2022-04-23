@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ng-deploy-80
+  template:
+    metadata:
+      labels:
+        app: ng-deploy-80
+    spec:
+      containers:
+        - name: ng-deploy-80
+          image: harbor.k8s.com/erp/nginx:1.16.1
+          ports:
+          - containerPort: 80
+          # 容器中的挂载点信息
+          volumeMounts:
+            # 指定容器中的挂载点
+            - mountPath: /cache
+              # 指定挂载卷的名称
+              name: cache-volume-ng-deploy-80
+      # 声明卷 此处声明的卷是针对整个pod中所有的容器声明的
+      volumes:
+        # 卷的名称
+        - name: cache-volume-ng-deploy-80
+          emptyDir: {}

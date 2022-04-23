@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ng-deploy-80
+    # matchExpressions:
+      # - {key: app, operator: In, values: [ng-deploy-80,ng-re-81]}
+  template:
+    metadata:
+      labels:
+        app: ng-deploy-80
+    spec:
+      containers:
+      - name: ng-deploy-80
+        image: harbor.k8s.com/erp/nginx:1.16.1
+        ports:
+        - containerPort: 90

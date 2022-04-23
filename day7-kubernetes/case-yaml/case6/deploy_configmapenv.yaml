@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: nginx-config
+data:
+  username: user1
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ng-deploy-80
+  template:
+    metadata:
+      labels:
+        app: ng-deploy-80
+    spec:
+      containers:
+      - name: ng-deploy-80
+        image: nginx 
+        env:
+        - name: MY_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: nginx-config
+              key: username
+        ports:
+        - containerPort: 80

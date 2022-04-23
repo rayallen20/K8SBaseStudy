@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+ default: |
+    server {
+       listen       80;
+       server_name  www.mysite.com;
+       index        index.html;
+
+       location / {
+           root /data/nginx/html;
+           if (!-e $request_filename) {
+               rewrite ^/(.*) /index.html last;
+           }
+       }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ng-deploy-80
+  template:
+    metadata:
+      labels:
+        app: ng-deploy-80
+    spec:
+      containers:
+      - name: ng-deploy-80
+        image: harbor.k8s.com/erp/nginx:1.16.1  
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - mountPath: /data/nginx/html
+          name: nginx-static-dir
+        - name: nginx-config
+          mountPath:  /etc/nginx/conf.d
+      volumes:
+      - name: nginx-static-dir
+        hostPath:
+          path: /data/nginx/linux39
+      - name: nginx-config
+        configMap:
+          name: nginx-config
+          items:
+             - key: default
+               path: mysite.conf
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ng-deploy-80
+spec:
+  ports:
+  - name: http
+    port: 81
+    targetPort: 80
+    nodePort: 30019
+    protocol: TCP
+  type: NodePort
+  selector:
+    app: ng-deploy-80

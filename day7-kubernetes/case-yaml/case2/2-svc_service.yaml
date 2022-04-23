@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ng-deploy-80
+spec:
+  ports:
+  - name: http
+    # service的端口号
+    port: 88
+    # 目标pod的端口号
+    targetPort: 80
+    protocol: TCP
+  # ClusterIP只能在集群内部访问
+  type: ClusterIP
+  selector:
+    # 选择pod用的label
+    app: ng-deploy-80

@@ -2294,6 +2294,1558 @@ Q:如何实现?
 
 A:声明一个ConfigMap对象,作为Volume挂载到pod中
 
+##### ConfigMap使用案例
+
+```
+root@k8s-master-1:~/case-yaml/case6# vim deploy_configmap.yaml 
+root@k8s-master-1:~/case-yaml/case6# cat deploy_configmap.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+ default: |
+    server {
+       listen       80;
+       server_name  www.mysite.com;
+       index        index.html;
+
+       location / {
+           root /data/nginx/html;
+           if (!-e $request_filename) {
+               rewrite ^/(.*) /index.html last;
+           }
+       }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ng-deploy-80
+  template:
+    metadata:
+      labels:
+        app: ng-deploy-80
+    spec:
+      containers:
+      - name: ng-deploy-80
+        image: harbor.k8s.com/erp/nginx:1.16.1  
+        ports:
+        - containerPort: 80
+        # volumeMounts的声明级别是针对container的
+        volumeMounts:
+        - mountPath: /data/nginx/html
+          name: nginx-static-dir
+          # 将名为nginx-config的volume挂载到当前容器中的/etc/nginx/conf.d上
+        - name: nginx-config
+          mountPath:  /etc/nginx/conf.d
+      # volume的声明级别是针对pod的    
+      volumes:
+      - name: nginx-static-dir
+        hostPath:
+          path: /data/erp
+      - name: nginx-config
+        configMap:
+          # configMap的名称
+          name: nginx-config
+          items:
+               # 此处的default 就是configMap.data
+             - key: default
+               # 容器中的挂载点
+               path: mysite.conf
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ng-deploy-80
+spec:
+  ports:
+  - name: http
+    port: 81
+    targetPort: 80
+    nodePort: 30019
+    protocol: TCP
+  type: NodePort
+  selector:
+    app: ng-deploy-80
+```
+
+```
+root@k8s-master-1:~/case-yaml/case6# kubectl apply -f deploy_configmap.yaml 
+configmap/nginx-config created
+deployment.apps/nginx-deployment created
+service/ng-deploy-80 created
+root@k8s-master-1:~/case-yaml/case6# kubectl get pod
+NAME                                READY   STATUS    RESTARTS   AGE
+net-test1                           1/1     Running   0          13h
+net-test2                           1/1     Running   0          13h
+net-test3                           1/1     Running   0          13h
+nginx-deployment-7cf4ff98b7-j6lpw   1/1     Running   0          16s
+```
+
+进入容器查看文件内容:
+
+```
+root@k8s-master-1:~/case-yaml/case6# kubectl exec -it nginx-deployment-7cf4ff98b7-j6lpw bash
+root@nginx-deployment-7cf4ff98b7-j6lpw:/# cat /etc/nginx/conf.d/mysite.conf
+server {
+   listen       80;
+   server_name  www.mysite.com;
+   index        index.html;
+
+   location / {
+       root /data/nginx/html;
+       if (!-e $request_filename) {
+           rewrite ^/(.*) /index.html last;
+       }
+   }
+}
+```
+
+更新configMap中的内容,此处以取消挂载为例:
+
+```
+root@k8s-master-1:~/case-yaml/case6# vim deploy_configmap.yaml 
+root@k8s-master-1:~/case-yaml/case6# cat deploy_configmap.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+ default: |
+    server {
+       listen       80;
+       server_name  www.mysite.com;
+       index        index.html;
+
+       location / {
+           root /data/nginx/html;
+           if (!-e $request_filename) {
+               rewrite ^/(.*) /index.html last;
+           }
+       }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ng-deploy-80
+  template:
+    metadata:
+      labels:
+        app: ng-deploy-80
+    spec:
+      containers:
+      - name: ng-deploy-80
+        image: harbor.k8s.com/erp/nginx:1.16.1  
+        ports:
+        - containerPort: 80
+        # volumeMounts的声明级别是针对container的
+        volumeMounts:
+        - mountPath: /data/nginx/html
+          name: nginx-static-dir
+          # 将名为nginx-config的volume挂载到当前容器中的/etc/nginx/conf.d上
+        #- name: nginx-config
+        #  mountPath:  /etc/nginx/conf.d
+      # volume的声明级别是针对pod的    
+      volumes:
+      - name: nginx-static-dir
+        hostPath:
+          path: /data/erp
+      - name: nginx-config
+        configMap:
+          # configMap的名称
+          name: nginx-config
+          items:
+               # 此处的default 就是configMap.data
+             - key: default
+               # 容器中的挂载点
+               path: mysite.conf
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ng-deploy-80
+spec:
+  ports:
+  - name: http
+    port: 81
+    targetPort: 80
+    nodePort: 30019
+    protocol: TCP
+  type: NodePort
+  selector:
+    app: ng-deploy-80
+```
+
+```
+root@k8s-master-1:~/case-yaml/case6# kubectl apply -f deploy_configmap.yaml 
+configmap/nginx-config unchanged
+deployment.apps/nginx-deployment configured
+service/ng-deploy-80 unchanged
+```
+
+进入容器查看:
+
+```
+root@k8s-master-1:~/case-yaml/case6# kubectl exec -it nginx-deployment-6dcf9898d5-2g4ts bash
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+root@nginx-deployment-6dcf9898d5-2g4ts:/# ls /etc/nginx/conf.d/
+default.conf
+```
+
+可以看到,没有configMap中的内容了
+
+尝试访问该pod:
+
+- step1. 恢复configMap中的配置
+
+```
+root@k8s-master-1:~/case-yaml/case6# vim deploy_configmap.yaml 
+root@k8s-master-1:~/case-yaml/case6# cat deploy_configmap.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+ default: |
+    server {
+       listen       80;
+       server_name  www.mysite.com;
+       index        index.html;
+
+       location / {
+           root /data/nginx/html;
+           if (!-e $request_filename) {
+               rewrite ^/(.*) /index.html last;
+           }
+       }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ng-deploy-80
+  template:
+    metadata:
+      labels:
+        app: ng-deploy-80
+    spec:
+      containers:
+      - name: ng-deploy-80
+        image: harbor.k8s.com/erp/nginx:1.16.1  
+        ports:
+        - containerPort: 80
+        # volumeMounts的声明级别是针对container的
+        volumeMounts:
+        - mountPath: /data/nginx/html
+          name: nginx-static-dir
+          # 将名为nginx-config的volume挂载到当前容器中的/etc/nginx/conf.d上
+        - name: nginx-config
+          mountPath:  /etc/nginx/conf.d
+      # volume的声明级别是针对pod的    
+      volumes:
+      - name: nginx-static-dir
+        hostPath:
+          path: /data/erp
+      - name: nginx-config
+        configMap:
+          # configMap的名称
+          name: nginx-config
+          items:
+               # 此处的default 就是configMap.data
+             - key: default
+               # 容器中的挂载点
+               path: mysite.conf
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ng-deploy-80
+spec:
+  ports:
+  - name: http
+    port: 81
+    targetPort: 80
+    nodePort: 30019
+    protocol: TCP
+  type: NodePort
+  selector:
+    app: ng-deploy-80
+```
+
+```
+root@k8s-master-1:~/case-yaml/case6# kubectl apply -f deploy_configmap.yaml 
+configmap/nginx-config unchanged
+deployment.apps/nginx-deployment configured
+service/ng-deploy-80 unchanged
+```
+
+```
+root@k8s-master-1:~/case-yaml/case6# kubectl get pod -A -o wide
+NAMESPACE              NAME                                        READY   STATUS    RESTARTS   AGE   IP              NODE            NOMINATED NODE   READINESS GATES
+default                net-test1                                   1/1     Running   0          14h   10.200.109.65   192.168.0.191   <none>           <none>
+default                net-test2                                   1/1     Running   0          14h   10.200.140.65   192.168.0.192   <none>           <none>
+default                net-test3                                   1/1     Running   0          14h   10.200.109.66   192.168.0.191   <none>           <none>
+default                nginx-deployment-7cf4ff98b7-5kdx6           1/1     Running   0          15s   10.200.76.131   192.168.0.193   <none>           <none>
+kube-system            calico-kube-controllers-75b57c64c6-wjftl    1/1     Running   0          14h   192.168.0.192   192.168.0.192   <none>           <none>
+kube-system            calico-node-4q6dp                           1/1     Running   0          13h   192.168.0.183   192.168.0.183   <none>           <none>
+kube-system            calico-node-5dmf4                           1/1     Running   0          13h   192.168.0.193   192.168.0.193   <none>           <none>
+kube-system            calico-node-6nsdd                           1/1     Running   0          13h   192.168.0.191   192.168.0.191   <none>           <none>
+kube-system            calico-node-8qsb6                           1/1     Running   0          13h   192.168.0.182   192.168.0.182   <none>           <none>
+kube-system            calico-node-jc4j6                           1/1     Running   0          13h   192.168.0.181   192.168.0.181   <none>           <none>
+kube-system            calico-node-lks6l                           1/1     Running   0          13h   192.168.0.192   192.168.0.192   <none>           <none>
+kube-system            coredns-5b86cf85-rsqhs                      1/1     Running   0          13h   10.200.140.66   192.168.0.192   <none>           <none>
+kubernetes-dashboard   dashboard-metrics-scraper-69995b67c-q2cmv   1/1     Running   0          13h   10.200.140.69   192.168.0.192   <none>           <none>
+kubernetes-dashboard   kubernetes-dashboard-54d6cc67d5-zqtl6       1/1     Running   0          13h   10.200.109.69   192.168.0.191   <none>           <none>
+```
+
+- step2. 在负载均衡器节点上设置转发规则
+
+```
+root@k8s-haproxy-1:~# vim /etc/haproxy/haproxy.cfg 
+root@k8s-haproxy-1:~# cat /etc/haproxy/haproxy.cfg
+global
+	log /dev/log	local0
+	log /dev/log	local1 notice
+	chroot /var/lib/haproxy
+	stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
+	stats timeout 30s
+	user haproxy
+	group haproxy
+	daemon
+
+	# Default SSL material locations
+	ca-base /etc/ssl/certs
+	crt-base /etc/ssl/private
+
+	# Default ciphers to use on SSL-enabled listening sockets.
+	# For more information, see ciphers(1SSL). This list is from:
+	#  https://hynek.me/articles/hardening-your-web-servers-ssl-ciphers/
+	# An alternative list with additional directives can be obtained from
+	#  https://mozilla.github.io/server-side-tls/ssl-config-generator/?server=haproxy
+	ssl-default-bind-ciphers ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:RSA+AESGCM:RSA+AES:!aNULL:!MD5:!DSS
+	ssl-default-bind-options no-sslv3
+
+defaults
+	log	global
+	mode	http
+	option	httplog
+	option	dontlognull
+        timeout connect 5000
+        timeout client  50000
+        timeout server  50000
+	errorfile 400 /etc/haproxy/errors/400.http
+	errorfile 403 /etc/haproxy/errors/403.http
+	errorfile 408 /etc/haproxy/errors/408.http
+	errorfile 500 /etc/haproxy/errors/500.http
+	errorfile 502 /etc/haproxy/errors/502.http
+	errorfile 503 /etc/haproxy/errors/503.http
+	errorfile 504 /etc/haproxy/errors/504.http
+
+listen k8s-6443
+  # bind的地址即keepalived配置的IP地址
+  bind 192.168.0.118:6443
+  mode tcp
+  # server的IP地址即为kub-apiserver的节点地址 即本例中所有的k8s-master地址
+  server k8s-master-1 192.168.0.181:6443 check inter 3s fall 3 rise 5
+  server k8s-master-2 192.168.0.182:6443 check inter 3s fall 3 rise 5
+  server k8s-master-3 192.168.0.183:6443 check inter 3s fall 3 rise 5
+
+listen erp-nginx-80
+  bind 192.168.0.119:80
+  mode tcp
+  server k8s-node-1 192.168.0.191:30019 check inter 3s fall 3 rise 5
+  server k8s-node-1 192.168.0.192:30019 check inter 3s fall 3 rise 5
+  server k8s-node-1 192.168.0.193:30019 check inter 3s fall 3 rise 5
+root@k8s-haproxy-1:~# systemctl restart haproxy.service 
+```
+
+- step3. 宿主机上添加一条hosts记录
+
+```
+root@192 ~ % sudo vim /etc/hosts
+root@192 ~ % cat /etc/hosts
+# Host Database
+#
+# localhost is used to configure the loopback interface
+# when the system is booting.  Do not change this entry.
+##
+127.0.0.1	localhost
+255.255.255.255	broadcasthost
+::1             localhost
+# Added by Docker Desktop
+# To allow the same kube context to work on the host and the container:
+127.0.0.1 kubernetes.docker.internal
+# End of section
+192.168.0.184 harbor.k8s.com
+192.168.0.119 www.mysite.com
+```
+
+- step4. 写入一个页面文件
+
+![创建首页文件](./img/创建首页文件.png)
+
+- step5. 访问
+
+![访问带有configMap的pod结果](./img/访问带有configMap的pod结果.png)
+
+##### 使用configMap向容器提供环境变量
+
+```
+root@k8s-master-1:~/case-yaml/case6# vim deploy_configmapenv.yaml 
+root@k8s-master-1:~/case-yaml/case6# cat deploy_configmapenv.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: nginx-config
+data:
+  # 可以使用configMap 向容器提供环境变量的值
+  username: user1
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ng-deploy-80
+  template:
+    metadata:
+      labels:
+        app: ng-deploy-80
+    spec:
+      containers:
+      - name: ng-deploy-80
+        image: harbor.k8s.com/erp/nginx:1.16.1
+        # 使用env字段 在yaml文件中为容器提供环境变量的变量名
+        env:
+        - name: MY_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: nginx-config
+              key: username
+        ports:
+        - containerPort: 80
+```
+
+```
+root@k8s-master-1:~/case-yaml/case6# kubectl apply -f deploy_configmapenv.yaml 
+configmap/nginx-config configured
+deployment.apps/nginx-deployment configured
+```
+
+![使用configMap向容器提供环境变量](./img/使用configMap向容器提供环境变量.png)
+
+实际上这种方式用的不是特别多,比较多的是直接使用env字段指定:
+
+```
+root@k8s-master-1:~/case-yaml/case6# vim deploy_configmapenv.yaml 
+root@k8s-master-1:~/case-yaml/case6# cat deploy_configmapenv.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: nginx-config
+data:
+  # 可以使用configMap 向容器提供环境变量的值
+  username: user1
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ng-deploy-80
+  template:
+    metadata:
+      labels:
+        app: ng-deploy-80
+    spec:
+      containers:
+      - name: ng-deploy-80
+        image: harbor.k8s.com/erp/nginx:1.16.1
+        # 使用env字段 在yaml文件中为容器提供环境变量的变量名
+        env:
+        - name: "MY_USERNAME"
+          value: "123456"
+        - name: "age"
+          value: "18"
+        ports:
+        - containerPort: 80
+```
+
+#### Statefulset
+
+Q:为什么需要Statefulset?
+
+A:为了解决有状态服务的问题
+
+Q:Statefulset是什么?
+
+A:Statefulset所管理的Pod有固定的名称、主机名、启停顺序
+
+Q:如何使用?
+
+A:创建一个statefulset类型的pod,并指定serviceName,创建headless类型的svc
+
+[statefulset演示](https://kubernetes.io/zh/docs/concepts/workloads/controllers/statefulset/)
+
+使用Statefulset创建pod时,是按顺序创建的,只有当第1个pod创建完毕并启动成功后,才会创建第2个pod.
+
+和Statefulset不同,使用deployment创建pod时,会同时创建多个pod.
+
+后期再演示,因为需要存储.
+
+#### DaemonSet
+
+DaemonSet在当前集群中每个节点运行同一个pod,当有新的节点加入集群时也会为新的节点配置相同的pod,当节点从集群中移除时其pod也会被kubernetes回收,但是删除DaemonSet将删除其创建的所有的pod.
+
+[DaemonSet介绍](https://kubernetes.io/zh/docs/concepts/workloads/controllers/daemonset/)
+
+DaemonSet使用场景:
+
+- 在每个节点上运行集群守护进程
+- 在每个节点上运行日志收集守护进程
+- 在每个节点上运行监控守护进程
+
+使用DaemonSet运行网络组件:
+
+```
+root@k8s-master-1:~/case-yaml/case6# kubectl get daemonset -A
+NAMESPACE     NAME          DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+kube-system   calico-node   6         6         6       6            6           kubernetes.io/os=linux   15h
+```
+
+##### Daemonset演示
+
+```
+root@k8s-master-1:~/case-yaml# mkdir case7
+root@k8s-master-1:~/case-yaml# cd case7
+root@k8s-master-1:~/case-yaml/case7# vim daemonset.yaml
+root@k8s-master-1:~/case-yaml/case7# cat daemonset.yaml
+```
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd-elasticsearch
+  namespace: kube-system
+  labels:
+    k8s-app: fluentd-logging
+spec:
+  selector:
+    matchLabels:
+      name: fluentd-elasticsearch
+  template:
+    metadata:
+      labels:
+        name: fluentd-elasticsearch
+    spec:
+      tolerations:
+      # this toleration is to have the daemonset runnable on master nodes
+      # remove it if your masters can't run pods
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: fluentd-elasticsearch
+        image: harbor.k8s.com/baseimages/fluentd:v2.5.2
+        resources:
+          limits:
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+      terminationGracePeriodSeconds: 30
+      volumes:
+      # 系统日志
+      - name: varlog
+        hostPath:
+          # 要收集宿主机的日志 但日志收集服务是通过pod起来的 所以现在面临的问题是pod要拿到宿主机的日志
+          # 1. 日志标准化 所有服务的日志要存放到统一的位置 例如: /data/log/nginx /data/log/kafka /data/log/mysql等
+          # 2. 写简单正则 获取所有日志文件 例如: /data/*/*.log
+          path: /var/log
+      # 容器日志
+      - name: varlibdockercontainers
+        hostPath:
+          # /var/lib/docker/containers 是docker默认存放日志的路径
+          path: /var/lib/docker/containers
+```
+
+```
+root@k8s-master-1:~/case-yaml/case7# kubectl apply -f daemonset.yaml 
+daemonset.apps/fluentd-elasticsearch created
+root@k8s-master-1:~/case-yaml/case7# kubectl get pod -A
+NAMESPACE              NAME                                        READY   STATUS    RESTARTS   AGE
+default                net-test1                                   1/1     Running   0          16h
+default                net-test2                                   1/1     Running   0          16h
+default                net-test3                                   1/1     Running   0          16h
+default                nginx-deployment-645fc9c5bf-s8wdf           1/1     Running   0          64m
+kube-system            calico-kube-controllers-75b57c64c6-wjftl    1/1     Running   0          16h
+kube-system            calico-node-4q6dp                           1/1     Running   0          15h
+kube-system            calico-node-5dmf4                           1/1     Running   0          15h
+kube-system            calico-node-6nsdd                           1/1     Running   0          15h
+kube-system            calico-node-8qsb6                           1/1     Running   0          15h
+kube-system            calico-node-jc4j6                           1/1     Running   0          15h
+kube-system            calico-node-lks6l                           1/1     Running   0          15h
+kube-system            coredns-5b86cf85-rsqhs                      1/1     Running   0          15h
+kube-system            fluentd-elasticsearch-5tws5                 1/1     Running   0          29s
+kube-system            fluentd-elasticsearch-cvvm7                 1/1     Running   0          29s
+kube-system            fluentd-elasticsearch-jzd59                 1/1     Running   0          29s
+kube-system            fluentd-elasticsearch-lqrt7                 1/1     Running   0          29s
+kube-system            fluentd-elasticsearch-mddg9                 1/1     Running   0          29s
+kube-system            fluentd-elasticsearch-tq9l4                 1/1     Running   0          29s
+kubernetes-dashboard   dashboard-metrics-scraper-69995b67c-q2cmv   1/1     Running   0          15h
+kubernetes-dashboard   kubernetes-dashboard-54d6cc67d5-zqtl6       1/1     Running   0          15h
+```
+
+#### PV/PVC
+
+Q:为什么需要PV和PVC?
+
+A:实现pod和storage的解耦,这样在修改storage时不需要修改pod,也可以实现存储和应用权限的隔离
+
+Q:PV和PVC是什么?
+
+A:PersistentVolume和PersistentVolumeClaim.PV和PVC是一个逻辑抽象,它们并不是直接存储数据,而是在storage和k8s之间做了一层隔离(权限控制、业务数据隔离等).
+
+PersistentVolume(PV)是由管理员设置的存储,它是集群的一部分.就像节点是集群中的资源一样,PV也是集群中的资源,不属于某个Pod.PV是Volume之类的卷插件,但具有独立于使用PV的Pod的 生命周期.此API对象包含存储实现的细节,即NFS、iSCSI或特定于云供应商的存储系统.
+
+PersistentVolumeClaim(PVC)是用户存储的请求.它与Pod相似.Pod消耗节点资源,PVC消耗PV资源.Pod可以请求特定级别的资源(CPU和内存).声明可以请求特定的大小和访问模式(例如:可以以读/写一次或只读多次模式挂载)
+
+PVC是一种接口,并不能直接对接物理存储,pod通过PVC对接到PV.PV实际上是个驱动,和物理存储对接.因此要先创建PV,再创建PVC.
+
+PVC分为2类:一种是手动创建的,另一种是动态创建.这种方式需要提前在K8S中创建一个存储类(实际上是PVC的模板,用于定义PVC的大小等信息),当需要创建PVC时通过存储类创建PVC.当然,Pod和PVC的绑定关系最终还是记录到etcd中的.
+
+[官方文档](https://kubernetes.io/zh/docs/concepts/storage/persistent-volumes/)
+
+PV的创建参数:
+
+capacity:不得大于底层存储的空间
+
+accessModes:用于控制PV能否同时被多个Pod挂载
+
+- ReadWriteOnce:PV只能被单个节点以读写权限挂载,RWO.使用场景:有状态服务,例如MySQL主从.主库有自己的PV,从库也有自己的PV.
+- ReadOnlyMany:PV可以被多个节点挂载,但权限为只读,ROX.使用场景:Nginx.用的不多.
+- ReadWriteMany:PV可以被多个节点以读写权限挂载,RWX.使用较多
+
+persistentVolumeReclaimPolicy:删除机制,即删除存储卷时,通过该PV创建的数据将被如何操作:
+
+- Retain:删除PV后数据保持原状不动,需要管理员手动删除.这种机制用的比较多
+- Recycle:空间回收,即删除存储卷上的所有数据(包括目录和隐藏文件),目前仅支持NFS和hostPath
+- Delete:自动删除存储卷.实际上和Retain一样
+
+volumeMode:卷类型.定义存储卷使用的文件系统是块设备还是文件系统,默认为文件系统
+
+mountOptions:附加的挂载选项列表,实现更精细的权限控制
+
+[各种文件系统对附加挂载项的支持](https://kubernetes.io/zh/docs/concepts/storage/persistent-volumes/#access-modes)
+
+PVC的创建参数:
+
+accessModes:用于控制PV能否同时被多个Pod挂载
+
+- ReadWriteOnce:PV只能被单个节点以读写权限挂载,RWO.使用场景:有状态服务,例如MySQL主从.主库有自己的PV,从库也有自己的PV.
+- ReadOnlyMany:PV可以被多个节点挂载,但权限为只读,ROX.使用场景:Nginx.用的不多.
+- ReadWriteMany:PV可以被多个节点以读写权限挂载,RWX.使用较多
+
+resources:资源大小.该值需小于等于PVC对应的PV的大小.
+
+注意:PV的namespace可以随便写一个,因为PV是K8S集群全局资源.但PVC的namespace必须和要关联的Pod处于同一个namespace下.
+
+selector:标签选择器,选择要绑定的PV
+
+matchLabels:匹配标签名称
+
+matchExpressions:基于正则表达式匹配
+
+volumeName:指定要绑定的PV的名称.这种方式比selector更加精确
+
+例如:PVC命名为`redis-datadir-pvc-1`,PV命名为`redis-datadir-pv-1`.如果redis是个集群,则可以继续向后命名:`redis-datadir-pvc-2`和`redis-datadir-pv-2`.以此类推.
+
+volumeMode:PVC类型.定义存储卷使用的文件系统是块设备还是文件系统,默认为文件系统
+
+##### 示例:基于PV和PVC运行zookeeper集群
+
+- step1. 拉取java8镜像并上传至harbor
+
+```
+root@ks8-harbor-2:~# docker pull elevy/slim_java:8
+8: Pulling from elevy/slim_java
+88286f41530e: Pull complete 
+7141511c4dad: Pull complete 
+fd529fe251b3: Pull complete 
+Digest: sha256:044e42fb89cda51e83701349a9b79e8117300f4841511ed853f73caf7fc98a51
+Status: Downloaded newer image for elevy/slim_java:8
+docker.io/elevy/slim_java:8
+root@ks8-harbor-2:~# docker tag elevy/slim_java:8 harbor.k8s.com/baseimages/slim_java:8
+root@ks8-harbor-2:~# docker push harbor.k8s.com/baseimages/slim_java:8
+The push refers to repository [harbor.k8s.com/baseimages/slim_java]
+e053edd72ca6: Pushed 
+aba783efb1a4: Pushed 
+5bef08742407: Pushed 
+8: digest: sha256:817d0af5d4f16c29509b8397784f5d4ec3accb1bfde4e474244ed3be7f41a604 size: 952
+```
+
+- step2. 准备业务镜像
+
+注意:打镜像时一定要加日期,否则后续的镜像清理工作没法做.
+
+配置zookeeper集群需添加如下配置:
+
+```
+server.1=zoo1:2888:3888
+server.2=zoo2:2888:3888
+server.3=zoo3:2888:3888
+```
+
+其中zoo1表示域名,也可以写IP地址.但在K8S中,pod的IP是不固定的,因此也没有办法给pod配置域名解析.因此要使用service.给每个pod配一个service.由于还需要存储,所以还要给每个pod配置单独的**一套**PV和PVC
+
+server.1表示集群中的节点,同一个集群内节点ID不能重复.
+
+选举机制:
+
+- step1. 集群第一次启动时,优先对比事务ID,但此时没有数据,所以所有节点的事务ID是一样的.因此对比不出来.
+- step2. 对比serverID.ID最大的节点将成为leader节点
+
+2888:集群端口,是leader节点向slaver节点同步数据时使用的.该端口只有leader节点才会监听
+
+3888:集群端口,用于选举.
+
+- step2.1 下载zookeeper
+
+[zookeeper3.4.14](https://archive.apache.org/dist/zookeeper/zookeeper-3.4.14/zookeeper-3.4.14.tar.gz)
+
+[zookeeper-3.4.14.tar.gz.asc](https://archive.apache.org/dist/zookeeper/zookeeper-3.4.14/zookeeper-3.4.14.tar.gz.asc)
+
+[KEY](https://archive.apache.org/dist/zookeeper/KEYS)
+
+- step2.2 编写启动zookeeper的脚本
+
+```
+root@ks8-harbor-2:/opt/k8s-data/zookeeper# pwd
+/opt/k8s-data/zookeeper
+root@ks8-harbor-2:/opt/k8s-data/zookeeper# cd ./bin/
+root@ks8-harbor-2:/opt/k8s-data/zookeeper/bin# vim zkReady.sh 
+root@ks8-harbor-2:/opt/k8s-data/zookeeper/bin# cat zkReady.sh
+#!/bin/bash
+
+/zookeeper/bin/zkServer.sh status | egrep 'Mode: (standalone|leading|following|observing)'
+```
+
+注:zsServer.sh在`zookeeper-3.4.14.tar.gz`解压缩后的`bin/`目录下,用于启动zookeeper的脚本
+
+- step2.3 编写容器启动时执行的脚本
+
+前面说过,以集群的方式启动zookeeper时,需要编写配置文件,向配置文件中添加serverID和对应的域名以及端口.此处以脚本的形式完成该任务
+
+```
+root@ks8-harbor-2:/opt/k8s-data/zookeeper/bin# cd ..
+root@ks8-harbor-2:/opt/k8s-data/zookeeper# vim entrypoint.sh 
+root@ks8-harbor-2:/opt/k8s-data/zookeeper# cat entrypoint.sh
+#!/bin/bash
+
+# 生成serverID并打印 MYID是创建pod时写入的环境变量
+echo ${MYID:-1} > /zookeeper/data/myid
+
+# SERVERS是创建pod时写入的环境变量
+if [ -n "$SERVERS" ]; then
+	IFS=\, read -a servers <<<"$SERVERS"
+	for i in "${!servers[@]}"; do 
+		# 将serverID追加到zk的配置文件中
+		printf "\nserver.%i=%s:2888:3888" "$((1 + $i))" "${servers[$i]}" >> /zookeeper/conf/zoo.cfg
+	done
+fi
+
+cd /zookeeper
+exec "$@"
+```
+
+- step2.4 编写Dockerfile
+
+```
+root@ks8-harbor-2:/opt/k8s-data/zookeeper# vim Dockerfile 
+root@ks8-harbor-2:/opt/k8s-data/zookeeper# cat Dockerfile
+FROM harbor.k8s.com/baseimages/slim_java:8
+ENV ZK_VERSION 3.4.14
+# 更换镜像仓库
+ADD repositories /etc/apk/repositories
+
+# 将zookeeper复制到镜像中
+COPY zookeeper-3.4.14.tar.gz /tmp/zk.tgz
+COPY zookeeper-3.4.14.tar.gz.asc /tmp/zk.tgz.asc
+COPY KEYS /tmp/KEYS
+
+# 安装依赖
+RUN apk add --no-cache --virtual .build-deps \
+      ca-certificates   \
+      gnupg             \
+      tar               \
+      wget &&           \
+    #
+    # Install dependencies
+    apk add --no-cache  \
+      bash &&           \
+    #
+    #
+    # 校验KEY
+    export GNUPGHOME="$(mktemp -d)" && \
+    gpg -q --batch --import /tmp/KEYS && \
+    gpg -q --batch --no-auto-key-retrieve --verify /tmp/zk.tgz.asc /tmp/zk.tgz && \
+    #
+    # 创建zookeeper安装路径
+    #
+    mkdir -p /zookeeper/data /zookeeper/wal /zookeeper/log && \
+    #
+    # 安装zookeeper
+    tar -x -C /zookeeper --strip-components=1 --no-same-owner -f /tmp/zk.tgz && \
+    #
+    # Slim down
+    cd /zookeeper && \
+    cp dist-maven/zookeeper-${ZK_VERSION}.jar . && \
+    rm -rf \
+      *.txt \
+      *.xml \
+      bin/README.txt \
+      bin/*.cmd \
+      conf/* \
+      contrib \
+      dist-maven \
+      docs \
+      lib/*.txt \
+      lib/cobertura \
+      lib/jdiff \
+      recipes \
+      src \
+      zookeeper-*.asc \
+      zookeeper-*.md5 \
+      zookeeper-*.sha1 && \
+    #
+    # 清理安装包
+    apk del .build-deps && \
+    rm -rf /tmp/* "$GNUPGHOME"
+
+COPY conf /zookeeper/conf/
+COPY bin/zkReady.sh /zookeeper/bin/
+COPY entrypoint.sh /
+
+ENV PATH=/zookeeper/bin:${PATH} \
+    ZOO_LOG_DIR=/zookeeper/log \
+    ZOO_LOG4J_PROP="INFO, CONSOLE, ROLLINGFILE" \
+    JMXPORT=9010
+
+# 该脚本用于生成serverID 并追加到配置文件
+ENTRYPOINT [ "/entrypoint.sh" ]
+
+CMD [ "zkServer.sh", "start-foreground" ]
+```
+
+- step2.5 编写构建并推送镜像的脚本
+
+```
+root@ks8-harbor-2:/opt/k8s-data/zookeeper# cat build_command.sh
+#!/bin/bash
+TAG=$1
+docker build -t harbor.k8s.com/erp/zookeeper:${TAG} . --network=host
+sleep 1
+docker push harbor.k8s.com/erp/zookeeper:${TAG}
+```
+
+- step2.6 运行脚本构建并推送镜像
+
+```
+root@ks8-harbor-2:/opt/k8s-data/zookeeper# chmod a+x *.sh
+root@ks8-harbor-2:/opt/k8s-data/zookeeper# bash build_command.sh uvxb8yrg_20220425_154023
+Sending build context to Docker daemon  37.76MB
+Step 1/14 : FROM harbor.k8s.com/baseimages/slim_java:8
+ ---> 0776147f4957
+Step 2/14 : ENV ZK_VERSION 3.4.14
+ ---> Running in 98d5ac04b0b2
+Removing intermediate container 98d5ac04b0b2
+ ---> 4fa70c3558cb
+Step 3/14 : ADD repositories /etc/apk/repositories
+ ---> d928c1678f28
+Step 4/14 : COPY zookeeper-3.4.14.tar.gz /tmp/zk.tgz
+ ---> 80fc92a59b3d
+Step 5/14 : COPY zookeeper-3.4.14.tar.gz.asc /tmp/zk.tgz.asc
+ ---> e8b6fab8499a
+Step 6/14 : COPY KEYS /tmp/KEYS
+ ---> 4ca25cc747a9
+Step 7/14 : RUN apk add --no-cache --virtual .build-deps       ca-certificates         gnupg                   tar                     wget &&               apk add --no-cache        bash &&               export GNUPGHOME="$(mktemp -d)" &&     gpg -q --batch --import /tmp/KEYS &&     gpg -q --batch --no-auto-key-retrieve --verify /tmp/zk.tgz.asc /tmp/zk.tgz &&     mkdir -p /zookeeper/data /zookeeper/wal /zookeeper/log &&     tar -x -C /zookeeper --strip-components=1 --no-same-owner -f /tmp/zk.tgz &&     cd /zookeeper &&     cp dist-maven/zookeeper-${ZK_VERSION}.jar . &&     rm -rf       *.txt       *.xml       bin/README.txt       bin/*.cmd       conf/*       contrib       dist-maven       docs       lib/*.txt       lib/cobertura       lib/jdiff       recipes       src       zookeeper-*.asc       zookeeper-*.md5       zookeeper-*.sha1 &&     apk del .build-deps &&     rm -rf /tmp/* "$GNUPGHOME"
+ ---> Running in cb3e19157ca2
+fetch http://mirrors.aliyun.com/alpine/v3.6/main/x86_64/APKINDEX.tar.gz
+fetch http://mirrors.aliyun.com/alpine/v3.6/community/x86_64/APKINDEX.tar.gz
+(1/19) Installing ca-certificates (20161130-r3)
+(2/19) Installing libgpg-error (1.27-r0)
+(3/19) Installing libassuan (2.4.3-r0)
+(4/19) Installing libcap (2.25-r1)
+(5/19) Installing ncurses-terminfo-base (6.0_p20171125-r1)
+(6/19) Installing ncurses-terminfo (6.0_p20171125-r1)
+(7/19) Installing ncurses-libs (6.0_p20171125-r1)
+(8/19) Installing pinentry (1.0.0-r0)
+Executing pinentry-1.0.0-r0.post-install
+(9/19) Installing libbz2 (1.0.6-r5)
+(10/19) Installing libgcrypt (1.7.10-r0)
+(11/19) Installing libksba (1.3.4-r0)
+(12/19) Installing db (5.3.28-r0)
+(13/19) Installing libsasl (2.1.26-r10)
+(14/19) Installing libldap (2.4.44-r5)
+(15/19) Installing npth (1.2-r0)
+(16/19) Installing gnupg (2.1.20-r1)
+(17/19) Installing tar (1.32-r0)
+(18/19) Installing wget (1.20.3-r0)
+(19/19) Installing .build-deps (0)
+Executing busybox-1.26.2-r5.trigger
+Executing ca-certificates-20161130-r3.trigger
+Executing glibc-bin-2.26-r0.trigger
+OK: 28 MiB in 33 packages
+fetch http://mirrors.aliyun.com/alpine/v3.6/main/x86_64/APKINDEX.tar.gz
+fetch http://mirrors.aliyun.com/alpine/v3.6/community/x86_64/APKINDEX.tar.gz
+(1/2) Installing readline (6.3.008-r5)
+(2/2) Installing bash (4.3.48-r1)
+Executing bash-4.3.48-r1.post-install
+Executing busybox-1.26.2-r5.trigger
+Executing glibc-bin-2.26-r0.trigger
+OK: 29 MiB in 35 packages
+gpg: Signature made Wed Mar  6 18:47:14 2019 UTC
+gpg:                using RSA key FFE35B7F15DFA1BA
+gpg: Good signature from "Andor Molnar <andor@apache.org>" [unknown]
+gpg: WARNING: This key is not certified with a trusted signature!
+gpg:          There is no indication that the signature belongs to the owner.
+Primary key fingerprint: 3F7A 1D16 FA42 17B1 DC75  E1C9 FFE3 5B7F 15DF A1BA
+WARNING: Ignoring APKINDEX.2009dfa3.tar.gz: No such file or directory
+WARNING: Ignoring APKINDEX.59e841ee.tar.gz: No such file or directory
+(1/16) Purging .build-deps (0)
+(2/16) Purging ca-certificates (20161130-r3)
+Executing ca-certificates-20161130-r3.post-deinstall
+(3/16) Purging gnupg (2.1.20-r1)
+(4/16) Purging pinentry (1.0.0-r0)
+Executing pinentry-1.0.0-r0.post-deinstall
+(5/16) Purging tar (1.32-r0)
+(6/16) Purging wget (1.20.3-r0)
+(7/16) Purging libksba (1.3.4-r0)
+(8/16) Purging libassuan (2.4.3-r0)
+(9/16) Purging libgcrypt (1.7.10-r0)
+(10/16) Purging libgpg-error (1.27-r0)
+(11/16) Purging libcap (2.25-r1)
+(12/16) Purging libbz2 (1.0.6-r5)
+(13/16) Purging libldap (2.4.44-r5)
+(14/16) Purging libsasl (2.1.26-r10)
+(15/16) Purging db (5.3.28-r0)
+(16/16) Purging npth (1.2-r0)
+Executing busybox-1.26.2-r5.trigger
+Executing glibc-bin-2.26-r0.trigger
+OK: 19 MiB in 19 packages
+Removing intermediate container cb3e19157ca2
+ ---> feac0aa7664f
+Step 8/14 : COPY conf /zookeeper/conf/
+ ---> da71c1ce97cc
+Step 9/14 : COPY bin/zkReady.sh /zookeeper/bin/
+ ---> 3bcd4d555e4f
+Step 10/14 : COPY entrypoint.sh /
+ ---> 389cd4288065
+Step 11/14 : ENV PATH=/zookeeper/bin:${PATH}     ZOO_LOG_DIR=/zookeeper/log     ZOO_LOG4J_PROP="INFO, CONSOLE, ROLLINGFILE"     JMXPORT=9010
+ ---> Running in 6e0d363716cf
+Removing intermediate container 6e0d363716cf
+ ---> 9bdcb8e1c7b6
+Step 12/14 : ENTRYPOINT [ "/entrypoint.sh" ]
+ ---> Running in 8ed6c7c03b0e
+Removing intermediate container 8ed6c7c03b0e
+ ---> a9e73b1d9cc9
+Step 13/14 : CMD [ "zkServer.sh", "start-foreground" ]
+ ---> Running in 971aa5dd291f
+Removing intermediate container 971aa5dd291f
+ ---> c9055ce22d4d
+Step 14/14 : EXPOSE 2181 2888 3888 9010
+ ---> Running in 7946f49f95f5
+Removing intermediate container 7946f49f95f5
+ ---> 46c829092f75
+Successfully built 46c829092f75
+Successfully tagged harbor.k8s.com/erp/zookeeper:uvxb8yrg_20220425_154023
+The push refers to repository [harbor.k8s.com/erp/zookeeper]
+7dd075a6d6d1: Pushed 
+24cdefb03aa1: Pushed 
+510ba47982bf: Pushed 
+6333f25680cd: Pushed 
+5aa677049597: Pushed 
+c8b86d012266: Pushed 
+6fa9ccf132e7: Pushed 
+f8cc35520434: Pushed 
+e053edd72ca6: Pushed 
+aba783efb1a4: Pushed 
+5bef08742407: Pushed 
+uvxb8yrg_20220425_154023: digest: sha256:fc04c9ea75f8da776f7575b5b43b8d184963cc12909e8215b23a589e733d6393 size: 2621
+```
+
+- step2.7 测试
+
+```
+root@ks8-harbor-2:/opt/k8s-data/zookeeper# docker run -it --rm harbor.k8s.com/erp/zookeeper:uvxb8yrg_20220425_154023
+ZooKeeper JMX enabled by default
+ZooKeeper remote JMX Port set to 9010
+ZooKeeper remote JMX authenticate set to false
+ZooKeeper remote JMX ssl set to false
+ZooKeeper remote JMX log4j set to true
+Using config: /zookeeper/bin/../conf/zoo.cfg
+2022-04-25 08:10:30,210 [myid:] - INFO  [main:QuorumPeerConfig@136] - Reading configuration from: /zookeeper/bin/../conf/zoo.cfg
+2022-04-25 08:10:30,215 [myid:] - INFO  [main:DatadirCleanupManager@78] - autopurge.snapRetainCount set to 3
+2022-04-25 08:10:30,216 [myid:] - INFO  [main:DatadirCleanupManager@79] - autopurge.purgeInterval set to 1
+2022-04-25 08:10:30,217 [myid:] - WARN  [main:QuorumPeerMain@116] - Either no config or no quorum defined in config, running  in standalone mode
+2022-04-25 08:10:30,218 [myid:] - INFO  [main:QuorumPeerConfig@136] - Reading configuration from: /zookeeper/bin/../conf/zoo.cfg
+2022-04-25 08:10:30,219 [myid:] - INFO  [main:ZooKeeperServerMain@98] - Starting server
+2022-04-25 08:10:30,225 [myid:] - INFO  [PurgeTask:DatadirCleanupManager$PurgeTask@138] - Purge task started.
+2022-04-25 08:10:30,239 [myid:] - INFO  [main:Environment@100] - Server environment:zookeeper.version=3.4.14-4c25d480e66aadd371de8bd2fd8da255ac140bcf, built on 03/06/2019 16:18 GMT
+2022-04-25 08:10:30,240 [myid:] - INFO  [main:Environment@100] - Server environment:host.name=edf839362bfd
+2022-04-25 08:10:30,241 [myid:] - INFO  [main:Environment@100] - Server environment:java.version=1.8.0_144
+2022-04-25 08:10:30,241 [myid:] - INFO  [main:Environment@100] - Server environment:java.vendor=Oracle Corporation
+2022-04-25 08:10:30,241 [myid:] - INFO  [main:Environment@100] - Server environment:java.home=/usr/lib/jvm/java-8-oracle
+2022-04-25 08:10:30,243 [myid:] - INFO  [main:Environment@100] - Server environment:java.class.path=/zookeeper/bin/../zookeeper-server/target/classes:/zookeeper/bin/../build/classes:/zookeeper/bin/../zookeeper-server/target/lib/*.jar:/zookeeper/bin/../build/lib/*.jar:/zookeeper/bin/../lib/slf4j-log4j12-1.7.25.jar:/zookeeper/bin/../lib/slf4j-api-1.7.25.jar:/zookeeper/bin/../lib/netty-3.10.6.Final.jar:/zookeeper/bin/../lib/log4j-1.2.17.jar:/zookeeper/bin/../lib/jline-0.9.94.jar:/zookeeper/bin/../lib/audience-annotations-0.5.0.jar:/zookeeper/bin/../zookeeper-3.4.14.jar:/zookeeper/bin/../zookeeper-server/src/main/resources/lib/*.jar:/zookeeper/bin/../conf:
+2022-04-25 08:10:30,243 [myid:] - INFO  [main:Environment@100] - Server environment:java.library.path=/usr/java/packages/lib/amd64:/usr/lib64:/lib64:/lib:/usr/lib
+2022-04-25 08:10:30,243 [myid:] - INFO  [main:Environment@100] - Server environment:java.io.tmpdir=/tmp
+2022-04-25 08:10:30,244 [myid:] - INFO  [main:Environment@100] - Server environment:java.compiler=<NA>
+2022-04-25 08:10:30,247 [myid:] - INFO  [main:Environment@100] - Server environment:os.name=Linux
+2022-04-25 08:10:30,248 [myid:] - INFO  [main:Environment@100] - Server environment:os.arch=amd64
+2022-04-25 08:10:30,248 [myid:] - INFO  [main:Environment@100] - Server environment:os.version=4.15.0-112-generic
+2022-04-25 08:10:30,249 [myid:] - INFO  [main:Environment@100] - Server environment:user.name=root
+2022-04-25 08:10:30,249 [myid:] - INFO  [main:Environment@100] - Server environment:user.home=/root
+2022-04-25 08:10:30,249 [myid:] - INFO  [main:Environment@100] - Server environment:user.dir=/zookeeper
+2022-04-25 08:10:30,252 [myid:] - INFO  [PurgeTask:DatadirCleanupManager$PurgeTask@144] - Purge task completed.
+2022-04-25 08:10:30,253 [myid:] - INFO  [main:ZooKeeperServer@836] - tickTime set to 2000
+2022-04-25 08:10:30,254 [myid:] - INFO  [main:ZooKeeperServer@845] - minSessionTimeout set to -1
+2022-04-25 08:10:30,254 [myid:] - INFO  [main:ZooKeeperServer@854] - maxSessionTimeout set to -1
+2022-04-25 08:10:30,261 [myid:] - INFO  [main:ServerCnxnFactory@117] - Using org.apache.zookeeper.server.NIOServerCnxnFactory as server connection factory
+2022-04-25 08:10:30,265 [myid:] - INFO  [main:NIOServerCnxnFactory@89] - binding to port 0.0.0.0/0.0.0.0:2181
+exit
+```
+
+打镜像时完整的目录结构如下:
+
+```
+root@ks8-harbor-2:/opt/k8s-data/zookeeper# tree ./
+./
+├── bin
+│   └── zkReady.sh
+├── build_command.sh
+├── conf
+│   ├── log4j.properties
+│   └── zoo.cfg
+├── Dockerfile
+├── entrypoint.sh
+├── KEYS
+├── repositories
+├── zookeeper-3.4.14.tar.gz
+└── zookeeper-3.4.14.tar.gz.asc
+
+2 directories, 10 files
+```
+
+- step3. 创建PV
+
+```
+root@k8s-master-1:~# mkdir k8s-data
+root@k8s-master-1:~# cd k8s-data/
+root@k8s-master-1:~/k8s-data# mkdir -pv zookeeper-yaml/pv
+mkdir: created directory 'zookeeper-yaml'
+mkdir: created directory 'zookeeper-yaml/pv'
+root@k8s-master-1:~/k8s-data# cd zookeeper-yaml/pv/
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/pv# vim zookeeper-persistentvolume.yaml
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/pv# cat zookeeper-persistentvolume.yaml
+```
+
+```yaml
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: zookeeper-datadir-pv-1
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    # 此处设计为1个pod对应1个pv 故pv的访问模式为ReadWriteOnce
+    - ReadWriteOnce
+  nfs:
+    server: 172.16.1.189
+    path: /data/k8sdata/erp/zookeeper-datadir-1
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: zookeeper-datadir-pv-2
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  nfs:
+    server: 172.16.1.189
+    path: /data/k8sdata/erp/zookeeper-datadir-2
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: zookeeper-datadir-pv-3
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  nfs:
+    server: 172.16.1.189
+    path: /data/k8sdata/erp/zookeeper-datadir-3
+```
+
+```
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/pv# kubectl apply -f zookeeper-persistentvolume.yaml 
+persistentvolume/zookeeper-datadir-pv-1 created
+persistentvolume/zookeeper-datadir-pv-2 created
+persistentvolume/zookeeper-datadir-pv-3 created
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/pv# kubectl get pv
+NAME                     CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS   REASON   AGE
+zookeeper-datadir-pv-1   2Gi        RWO            Retain           Available                                   4s
+zookeeper-datadir-pv-2   2Gi        RWO            Retain           Available                                   4s
+zookeeper-datadir-pv-3   2Gi        RWO            Retain           Available                                   4s
+```
+
+- step4. 创建namespace
+
+```
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/pv# cd ..
+root@k8s-master-1:~/k8s-data/zookeeper-yaml# mkdir namespace
+root@k8s-master-1:~/k8s-data/zookeeper-yaml# cd namespace/
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/namespace# vim erp.yaml
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/namespace# cat erp.yaml 
+```
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: erp
+```  
+
+```
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/namespace# kubectl apply -f erp.yaml 
+namespace/erp created
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/namespace# kubectl get ns
+NAME                   STATUS   AGE
+default                Active   2d10h
+erp                    Active   5s
+kube-node-lease        Active   2d10h
+kube-public            Active   2d10h
+kube-system            Active   2d10h
+kubernetes-dashboard   Active   2d9h
+```
+
+- step5. 创建pvc
+
+注意:pvc必须和pod处于同一namespace下才能绑定
+
+```
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/namespace# cd ..
+root@k8s-master-1:~/k8s-data/zookeeper-yaml# mkdir pvc
+root@k8s-master-1:~/k8s-data/zookeeper-yaml# cd pvc/
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/pvc# vim zookeeper-persistentvolumeclaim.yaml
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/pvc# cat zookeeper-persistentvolumeclaim.yaml
+```
+
+```yaml
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  # pvc的名称 后续pod通过pvc的名称和指定的pvc产生绑定关系
+  name: zookeeper-datadir-pvc-1
+  namespace: erp
+spec:
+  accessModes:
+    - ReadWriteOnce
+    # pv的名称 pvc通过pv的名称和pv产生绑定关系
+  volumeName: zookeeper-datadir-pv-1
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  # pvc的名称 后续pod通过pvc的名称和指定的pvc产生绑定关系
+  name: zookeeper-datadir-pvc-2
+  namespace: erp
+spec:
+  accessModes:
+    - ReadWriteOnce
+    # pv的名称 pvc通过pv的名称和pv产生绑定关系
+  volumeName: zookeeper-datadir-pv-2
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  # pvc的名称 后续pod通过pvc的名称和指定的pvc产生绑定关系
+  name: zookeeper-datadir-pvc-3
+  namespace: erp
+spec:
+  accessModes:
+    - ReadWriteOnce
+    # pv的名称 pvc通过pv的名称和pv产生绑定关系
+  volumeName: zookeeper-datadir-pv-3
+  resources:
+    requests:
+      storage: 1Gi
+```
+
+```
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/pvc# kubectl apply -f zookeeper-persistentvolumeclaim.yaml 
+persistentvolumeclaim/zookeeper-datadir-pvc-1 created
+persistentvolumeclaim/zookeeper-datadir-pvc-2 created
+persistentvolumeclaim/zookeeper-datadir-pvc-3 created
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/pvc# kubectl get pvc -n erp
+NAME                      STATUS   VOLUME                   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+zookeeper-datadir-pvc-1   Bound    zookeeper-datadir-pv-1   2Gi        RWO                           7s
+zookeeper-datadir-pvc-2   Bound    zookeeper-datadir-pv-2   2Gi        RWO                           6s
+zookeeper-datadir-pvc-3   Bound    zookeeper-datadir-pv-3   2Gi        RWO                           6s
+```
+
+- step6. 创建pod
+
+```
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/namespace# cd ..
+root@k8s-master-1:~/k8s-data/zookeeper-yaml# mkdir pod
+root@k8s-master-1:~/k8s-data/zookeeper-yaml# cd pod
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/pod# vim zookeeper.yaml
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/pod# cat zookeeper.yaml
+```
+
+```yaml
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: zookeeper1
+  namespace: erp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+        # 后续service通过该标签选择指定的pod
+        server-id: "1"
+    spec:
+      containers:
+        - name: server
+          image: harbor.k8s.com/erp/zookeeper:uvxb8yrg_20220425_154023
+          imagePullPolicy: Always
+          env:
+            # 此处定义的环境变量即为容器启动时执行的脚本entrypoint.sh中使用的环境变量
+            - name: MYID
+              value: "1"
+            - name: SERVERS
+              value: "zookeeper1,zookeeper2,zookeeper3"
+            - name: JVMFLAGS
+              value: "-Xmx1G"
+          ports:
+            - containerPort: 2181
+            - containerPort: 2888
+            - containerPort: 3888
+          volumeMounts:
+            # 此处的挂载点为zookeeper保存数据的路径 在构建镜像时 /conf/zoo.cfg中定义了该路径
+            - mountPath: "/zookeeper/data"
+              name: zookeeper-datadir-pvc-1
+      volumes:
+        - name: zookeeper-datadir-pvc-1
+          persistentVolumeClaim:
+            # 通过pvc的名称指定要绑定的pvc
+            claimName: zookeeper-datadir-pvc-1
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: zookeeper2
+  namespace: erp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+        # 后续service通过该标签选择指定的pod
+        server-id: "2"
+    spec:
+      containers:
+        - name: server
+          image: harbor.k8s.com/erp/zookeeper:uvxb8yrg_20220425_154023
+          imagePullPolicy: Always
+          env:
+            # 此处定义的环境变量即为容器启动时执行的脚本entrypoint.sh中使用的环境变量
+            - name: MYID
+              value: "2"
+            - name: SERVERS
+              value: "zookeeper1,zookeeper2,zookeeper3"
+            - name: JVMFLAGS
+              value: "-Xmx1G"
+          ports:
+            - containerPort: 2181
+            - containerPort: 2888
+            - containerPort: 3888
+          volumeMounts:
+            # 此处的挂载点为zookeeper保存数据的路径 在构建镜像时 /conf/zoo.cfg中定义了该路径
+            - mountPath: "/zookeeper/data"
+              name: zookeeper-datadir-pvc-2
+      volumes:
+        - name: zookeeper-datadir-pvc-2
+          persistentVolumeClaim:
+            # 通过pvc的名称指定要绑定的pvc
+            claimName: zookeeper-datadir-pvc-2
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: zookeeper3
+  namespace: erp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+        # 后续service通过该标签选择指定的pod
+        server-id: "3"
+    spec:
+      containers:
+        - name: server
+          image: harbor.k8s.com/erp/zookeeper:uvxb8yrg_20220425_154023
+          imagePullPolicy: Always
+          env:
+            # 此处定义的环境变量即为容器启动时执行的脚本entrypoint.sh中使用的环境变量
+            - name: MYID
+              value: "3"
+            - name: SERVERS
+              value: "zookeeper1,zookeeper2,zookeeper3"
+            - name: JVMFLAGS
+              value: "-Xmx1G"
+          ports:
+            - containerPort: 2181
+            - containerPort: 2888
+            - containerPort: 3888
+          volumeMounts:
+            # 此处的挂载点为zookeeper保存数据的路径 在构建镜像时 /conf/zoo.cfg中定义了该路径
+            - mountPath: "/zookeeper/data"
+              name: zookeeper-datadir-pvc-3
+      volumes:
+        - name: zookeeper-datadir-pvc-3
+          persistentVolumeClaim:
+            # 通过pvc的名称指定要绑定的pvc
+            claimName: zookeeper-datadir-pvc-3
+```
+
+```
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/pod# kubectl apply -f zookeeper.yaml 
+deployment.apps/zookeeper1 created
+deployment.apps/zookeeper2 created
+deployment.apps/zookeeper3 created
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/pod# kubectl get pod -n erp
+NAME                          READY   STATUS    RESTARTS   AGE
+zookeeper1-7ff6fbfbf-85krr    1/1     Running   0          10s
+zookeeper2-94cfd4596-mhzkk    1/1     Running   0          10s
+zookeeper3-7f55657779-h7s4z   1/1     Running   0          10s
+```
+
+- step7. 创建service
+
+```
+root@k8s-master-1:~/k8s-data/zookeeper-yaml/pod# cd ..
+root@k8s-master-1:~/k8s-data/zookeeper-yaml# mkdir service
+root@k8s-master-1:~/k8s-data/zookeeper-yaml# vim zookeeper.yaml
+root@k8s-master-1:~/k8s-data/zookeeper-yaml# cat zookeeper.yaml
+```
+
+```yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper1
+  namespace: erp
+spec:
+  type: NodePort
+  ports:
+    - name: client
+      # 只写port不写targetPort 默认targetPort的端口号和port相同?
+      port: 2181
+      nodePort: 42181
+    - name: followers
+      port: 2888
+    - name: election
+      port: 3888
+  selector:
+    app: zookeeper
+    server-id: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper2
+  namespace: erp
+spec:
+  type: NodePort
+  ports:
+    - name: client
+      # 只写port不写targetPort 默认targetPort的端口号和port相同?
+      port: 2181
+      nodePort: 42182
+    - name: followers
+      port: 2888
+    - name: election
+      port: 3888
+  selector:
+    app: zookeeper
+    server-id: "2"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper3
+  namespace: erp
+spec:
+  type: NodePort
+  ports:
+    - name: client
+      # 只写port不写targetPort 默认targetPort的端口号和port相同?
+      port: 2181
+      nodePort: 42183
+    - name: followers
+      port: 2888
+    - name: election
+      port: 3888
+  selector:
+    app: zookeeper
+    server-id: "3"
+```
+
+```
+root@k8s-master-1:~/k8s-data/zookeeper-yaml# kubectl apply -f zookeeper.yaml 
+service/zookeeper1 created
+service/zookeeper2 created
+service/zookeeper3 created
+root@k8s-master-1:~/k8s-data/zookeeper-yaml# kubectl get service -n erp
+NAME         TYPE       CLUSTER-IP       EXTERNAL-IP   PORT(S)                                        AGE
+zookeeper1   NodePort   10.100.184.160   <none>        2181:42181/TCP,2888:43385/TCP,3888:39547/TCP   18s
+zookeeper2   NodePort   10.100.17.68     <none>        2181:42182/TCP,2888:62636/TCP,3888:36521/TCP   17s
+zookeeper3   NodePort   10.100.146.59    <none>        2181:42183/TCP,2888:34167/TCP,3888:47769/TCP   17s
+```
+
+- step8. 查看数据是否写入nfs
+
+```
+root@k8s-haproxy-1:/data/k8sdata/erp/zookeeper-datadir-1# ls
+myid  version-2
+root@k8s-haproxy-1:/data/k8sdata/erp/zookeeper-datadir-1# cd ..
+root@k8s-haproxy-1:/data/k8sdata/erp# ls zookeeper-datadir-1
+myid  version-2
+root@k8s-haproxy-1:/data/k8sdata/erp# ls zookeeper-datadir-2
+myid  version-2
+root@k8s-haproxy-1:/data/k8sdata/erp# ls zookeeper-datadir-3
+myid  version-2
+root@k8s-haproxy-1:/data/k8sdata/erp# cat zookeeper-datadir-1/myid 
+1
+root@k8s-haproxy-1:/data/k8sdata/erp# cat zookeeper-datadir-2/myid 
+2
+root@k8s-haproxy-1:/data/k8sdata/erp# cat zookeeper-datadir-3/myid 
+3
+```
+
+- step9. 查看zookeeper是否为集群
+
+```
+root@k8s-master-1:~/k8s-data/zookeeper-yaml# kubectl exec -it -n erp zookeeper1-7ff6fbfbf-85krr bash
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+bash-4.3# /zookeeper/bin/zkServer.sh status
+ZooKeeper JMX enabled by default
+ZooKeeper remote JMX Port set to 9010
+ZooKeeper remote JMX authenticate set to false
+ZooKeeper remote JMX ssl set to false
+ZooKeeper remote JMX log4j set to true
+Using config: /zookeeper/bin/../conf/zoo.cfg
+Mode: follower
+```
+
+注:如果是3个单机 则Mode为standAlone
+
+- step10. 测试端口是否被监听
+
+```
+root@k8s-master-1:~/k8s-data/zookeeper-yaml# telnet 192.168.0.193 42181
+Trying 192.168.0.193...
+Connected to 192.168.0.193.
+```
+
 ## 附1:制作dashboard登录时验证的配置文件
 
 - step1. 复制kubernetes认证文件并添加token

@@ -1,0 +1,60 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper1
+  namespace: erp
+spec:
+  type: NodePort
+  ports:
+    - name: client
+      # 只写port不写targetPort 默认targetPort的端口号和port相同?
+      port: 2181
+      nodePort: 42181
+    - name: followers
+      port: 2888
+    - name: election
+      port: 3888
+  selector:
+    app: zookeeper
+    server-id: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper2
+  namespace: erp
+spec:
+  type: NodePort
+  ports:
+    - name: client
+      # 只写port不写targetPort 默认targetPort的端口号和port相同?
+      port: 2181
+      nodePort: 42182
+    - name: followers
+      port: 2888
+    - name: election
+      port: 3888
+  selector:
+    app: zookeeper
+    server-id: "2"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper3
+  namespace: erp
+spec:
+  type: NodePort
+  ports:
+    - name: client
+      # 只写port不写targetPort 默认targetPort的端口号和port相同?
+      port: 2181
+      nodePort: 42183
+    - name: followers
+      port: 2888
+    - name: election
+      port: 3888
+  selector:
+    app: zookeeper
+    server-id: "3"

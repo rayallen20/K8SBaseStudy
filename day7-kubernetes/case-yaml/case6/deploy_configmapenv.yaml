@@ -4,6 +4,7 @@ kind: ConfigMap
 metadata:
   name: nginx-config
 data:
+  # 可以使用configMap 向容器提供环境变量的值
   username: user1
 
 
@@ -24,7 +25,8 @@ spec:
     spec:
       containers:
       - name: ng-deploy-80
-        image: nginx 
+        image: harbor.k8s.com/erp/nginx:1.16.1
+        # 使用env字段 在yaml文件中为容器提供环境变量的变量名
         env:
         - name: MY_USERNAME
           valueFrom:

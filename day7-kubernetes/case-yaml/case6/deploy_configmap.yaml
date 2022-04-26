@@ -37,20 +37,26 @@ spec:
         image: harbor.k8s.com/erp/nginx:1.16.1  
         ports:
         - containerPort: 80
+        # volumeMounts的声明级别是针对container的
         volumeMounts:
         - mountPath: /data/nginx/html
           name: nginx-static-dir
+          # 将名为nginx-config的volume挂载到当前容器中的/etc/nginx/conf.d上
         - name: nginx-config
           mountPath:  /etc/nginx/conf.d
+      # volume的声明级别是针对pod的    
       volumes:
       - name: nginx-static-dir
         hostPath:
-          path: /data/nginx/linux39
+          path: /data/erp
       - name: nginx-config
         configMap:
+          # configMap的名称
           name: nginx-config
           items:
+               # 此处的default 就是configMap.data
              - key: default
+               # 容器中的挂载点
                path: mysite.conf
 
 ---

@@ -1,0 +1,53 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: erp-nginx-webapp-deployment-label
+  name: erp-nginx-webapp-deployment
+  namespace: erp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: erp-nginx-webapp-selector
+  template:
+    metadata:
+      labels:
+        app: erp-nginx-webapp-selector
+    spec:
+      containers:
+        - name: erp-nginx-webapp-container
+          image: harbor.k8s.com/erp/nginx-webapp:v2
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+              protocol: TCP
+              name: http
+            - containerPort: 443
+              protocol: TCP
+              name: https
+          resources:
+            limits:
+              cpu: 300m
+              memory: 256Mi
+            requests:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: nginx-webapp-images
+              # 此处的挂载点是打镜像时创建的路径
+              mountPath: /usr/local/nginx/html/webapp/images
+              readOnly: false
+            - name: nginx-webapp-static
+              # 此处的挂载点是打镜像时创建的路径
+              mountPath: /usr/local/nginx/html/webapp/static
+              readOnly: false
+      volumes:
+        - name: nginx-webapp-images
+          nfs:
+            server: 172.16.1.189
+            path: /data/k8sdata/nginx-webapp/images
+        - name: nginx-webapp-static
+          nfs:
+            server: 172.16.1.189
+            path: /data/k8sdata/nginx-webapp/static

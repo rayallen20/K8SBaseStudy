@@ -1,0 +1,22 @@
+kind: Service
+apiVersion: v1
+metadata:
+  labels:
+    app: erp-nginx-webapp-service-label
+  name: erp-nginx-webapp-service
+  namespace: erp
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 80
+      nodePort: 40002
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: 443
+      nodePort: 40443
+  selector:
+    app: erp-nginx-webapp-selector

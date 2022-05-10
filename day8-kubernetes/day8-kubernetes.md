@@ -956,7 +956,7 @@ root@ks8-harbor-2:/opt/k8s-data/biz-img/tomcatapp/app# vim index1.html
 root@ks8-harbor-2:/opt/k8s-data/biz-img/tomcatapp/app# cat index1.html
 ```
 
-```yaml
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -978,7 +978,7 @@ root@ks8-harbor-2:/opt/k8s-data/biz-img/tomcatapp/app/dir1# vim index.html
 root@ks8-harbor-2:/opt/k8s-data/biz-img/tomcatapp/app/dir1# cat index.html
 ```
 
-```yaml
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1993,15 +1993,492 @@ ff02::2	ip6-allrouters
 172.17.0.2	25b69bedae0c
 ```
 
+![tomcat业务镜像默认页面](./img/tomcat业务镜像默认页面.png)
+
+### 1.5 在K8S上运行tomcat-webapp
+
+#### 1.5.1 创建pod
+
+```
+root@k8s-master-1:~/k8s-data# mkdir tomcat-webapp-yaml
+root@k8s-master-1:~/k8s-data# cd tomcat-webapp-yaml/
+root@k8s-master-1:~/k8s-data/tomcat-webapp-yaml# vim tomcat-webapp-deployment.yaml
+root@k8s-master-1:~/k8s-data/tomcat-webapp-yaml# cat tomcat-webapp-deployment.yaml 
+```
+
+```yaml
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: erp-tomcat-webapp-deployment-label
+  name: erp-tomcat-webapp-deployment
+  namespace:
+    erp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: erp-tomcat-webapp-selector
+  template:
+    metadata:
+      labels:
+        app: erp-tomcat-webapp-selector
+    spec:
+      containers:
+        - name: erp-tomcat-webapp-container
+          image: harbor.k8s.com/erp/tomcat-webapp:v1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+              name: http
+          resources:
+            limits:
+              cpu: 1
+              memory: "512Mi"
+            requests:
+              cpu: 500m
+              memory: "512Mi"
+          volumeMounts:
+            - name: tomcat-webapp-images
+              mountPath: /usr/local/nginx/html/webapp/images
+              readOnly: false
+            - name: tomcat-webapp-static
+              mountPath: /usr/local/nginx/html/webapp/static
+              readOnly: false
+      volumes:
+        - name: tomcat-webapp-images
+          nfs:
+            server: 172.16.1.189
+            path: /data/k8sdata/nginx-webapp/images
+        - name: tomcat-webapp-static
+          nfs:
+            server: 172.16.1.189
+            path: /data/k8sdata/nginx-webapp/static
+```
+
+```
+root@k8s-master-1:~/k8s-data/tomcat-webapp-yaml# kubectl apply -f tomcat-webapp-deployment.yaml 
+deployment.apps/erp-tomcat-webapp-deployment created
+root@k8s-master-1:~/k8s-data/tomcat-webapp-yaml# kubectl get pod -n erp
+NAME                                            READY   STATUS    RESTARTS   AGE
+erp-nginx-webapp-deployment-699bc7887f-ctrb9    1/1     Running   0          126m
+erp-tomcat-webapp-deployment-84bbf6b865-wgtjj   1/1     Running   0          22s
+zookeeper1-7ff6fbfbf-j428g                      1/1     Running   0          127m
+zookeeper2-94cfd4596-9bgll                      1/1     Running   0          127m
+zookeeper3-7f55657779-h62k6                     1/1     Running   0          127m
+```
+
+#### 1.5.2 创建service
+
+```
+root@k8s-master-1:~/k8s-data/tomcat-webapp-yaml# vim tomcat-webapp-service.yaml
+root@k8s-master-1:~/k8s-data/tomcat-webapp-yaml# cat tomcat-webapp-service.yaml
+```
+
+```yaml
+kind: Service
+apiVersion: v1
+metadata: 
+  labels:
+    app: erp-tomcat-webapp-service-label
+  name: erp-tomcat-webapp-service
+  namespace: erp
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+    nodePort: 40003
+  selector:
+    app: erp-tomcat-webapp-selector
+```
+
+```
+root@k8s-master-1:~/k8s-data/tomcat-webapp-yaml# kubectl apply -f tomcat-webapp-service.yaml 
+service/erp-tomcat-webapp-service created
+root@k8s-master-1:~/k8s-data/tomcat-webapp-yaml# kubectl get service -n erp
+NAME                        TYPE       CLUSTER-IP       EXTERNAL-IP   PORT(S)                                        AGE
+erp-nginx-webapp-service    NodePort   10.100.9.36      <none>        80:40002/TCP,443:40443/TCP                     13d
+erp-tomcat-webapp-service   NodePort   10.100.139.19    <none>        80:40003/TCP                                   10s
+zookeeper1                  NodePort   10.100.184.160   <none>        2181:42181/TCP,2888:43385/TCP,3888:39547/TCP   14d
+zookeeper2                  NodePort   10.100.17.68     <none>        2181:42182/TCP,2888:62636/TCP,3888:36521/TCP   14d
+zookeeper3                  NodePort   10.100.146.59    <none>        2181:42183/TCP,2888:34167/TCP,3888:47769/TCP   14d
+```
+
+#### 1.5.3 测试
+
+![在nginxPod中访问tomcatService](./img/在nginxPod中访问tomcatService.png)
+
+### 1.6 修改nginx.conf,将对myapp的请求转发给tomcatService
+
+这一步修改后需要重新打镜像.
+
+- step1. 修改nginx.conf文件
+
+此处需配置转发规则和对应的upstream
+
+```
+root@ks8-harbor-2:/opt/k8s-data/biz-img/webapp# vim nginx.conf 
+root@ks8-harbor-2:/opt/k8s-data/biz-img/webapp# cat nginx.conf
+user  nginx nginx;
+worker_processes  auto;
+
+#error_log  logs/error.log;
+#error_log  logs/error.log  notice;
+#error_log  logs/error.log  info;
+
+#pid        logs/nginx.pid;
+daemon off;
+
+events {
+    worker_connections  1024;
+}
 
 
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    #log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+    #                  '$status $body_bytes_sent "$http_referer" '
+    #                  '"$http_user_agent" "$http_x_forwarded_for"';
+
+    #access_log  logs/access.log  main;
+
+    sendfile        on;
+    #tcp_nopush     on;
+
+    #keepalive_timeout  0;
+    keepalive_timeout  65;
+
+    #gzip  on;
+    
+    # 定义upstream
+    upstream  tomcat_webserver {
+	    # 此处写的是service的全称 格式为:serviceName.namespace.svc.后缀:service的端口
+	    # 其中后缀在创建集群时定义
+            server   erp-tomcat-webapp-service.erp.svc.mycluster.local:80;
+    }
+    server {
+        listen       80;
+        server_name  localhost;
+
+        #charset koi8-r;
+
+        #access_log  logs/host.access.log  main;
+
+        location / {
+            root   html;
+            index  index.html index.htm;
+        }
+
+        # 业务项目转发规则 此处的/webapp,指的是相对于nginx安装路径的webapp
+        location /webapp {
+            root   html;
+            index  index.html index.htm;
+        }
+
+		# 将/myapp的请求转发给tomcat
+        location /myapp {
+             proxy_pass  http://tomcat_webserver;
+             proxy_set_header   Host    $host;
+             proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+             proxy_set_header X-Real-IP $remote_addr;
+        }
+
+        #error_page  404              /404.html;
+
+        # redirect server error pages to the static page /50x.html
+        #
+        error_page   500 502 503 504  /50x.html;
+        location = /50x.html {
+            root   html;
+        }
+
+        # proxy the PHP scripts to Apache listening on 127.0.0.1:80
+        #
+        #location ~ \.php$ {
+        #    proxy_pass   http://127.0.0.1;
+        #}
+
+        # pass the PHP scripts to FastCGI server listening on 127.0.0.1:9000
+        #
+        #location ~ \.php$ {
+        #    root           html;
+        #    fastcgi_pass   127.0.0.1:9000;
+        #    fastcgi_index  index.php;
+        #    fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
+        #    include        fastcgi_params;
+        #}
+
+        # deny access to .htaccess files, if Apache's document root
+        # concurs with nginx's one
+        #
+        #location ~ /\.ht {
+        #    deny  all;
+        #}
+    }
 
 
+    # another virtual host using mix of IP-, name-, and port-based configuration
+    #
+    #server {
+    #    listen       8000;
+    #    listen       somename:8080;
+    #    server_name  somename  alias  another.alias;
+
+    #    location / {
+    #        root   html;
+    #        index  index.html index.htm;
+    #    }
+    #}
 
 
+    # HTTPS server
+    #
+    #server {
+    #    listen       443 ssl;
+    #    server_name  localhost;
+
+    #    ssl_certificate      cert.pem;
+    #    ssl_certificate_key  cert.key;
+
+    #    ssl_session_cache    shared:SSL:1m;
+    #    ssl_session_timeout  5m;
+
+    #    ssl_ciphers  HIGH:!aNULL:!MD5;
+    #    ssl_prefer_server_ciphers  on;
+
+    #    location / {
+    #        root   html;
+    #        index  index.html index.htm;
+    #    }
+    #}
+
+}
+```
+
+- step2. 构建镜像
+
+```
+root@ks8-harbor-2:/opt/k8s-data/biz-img/webapp# bash build-command.sh v3
+Sending build context to Docker daemon  10.24kB
+Step 1/7 : FROM harbor.k8s.com/pub-images/nginx-base:v1.18.0
+ ---> e59b79b986d5
+Step 2/7 : ADD nginx.conf /usr/local/nginx/conf/nginx.conf
+ ---> 77f0aca61980
+Step 3/7 : ADD webapp.tar.gz /usr/local/nginx/html/webapp/
+ ---> 539207c82ab1
+Step 4/7 : ADD index.html /usr/local/nginx/html/index.html
+ ---> ce694bedc263
+Step 5/7 : RUN mkdir -p /usr/local/nginx/html/webapp/static /usr/local/nginx/html/webapp/images
+ ---> Running in 73ede26c66ab
+Removing intermediate container 73ede26c66ab
+ ---> bf8481e15271
+Step 6/7 : EXPOSE 80 443
+ ---> Running in ac6405288567
+Removing intermediate container ac6405288567
+ ---> 3677b8129af2
+Step 7/7 : CMD ["nginx"]
+ ---> Running in 37f05cd3c965
+Removing intermediate container 37f05cd3c965
+ ---> c5b834834e38
+Successfully built c5b834834e38
+Successfully tagged harbor.k8s.com/erp/nginx-webapp:v3
+build image complete.Start push image to harbor now.
+The push refers to repository [harbor.k8s.com/erp/nginx-webapp]
+b0651be0dc1d: Pushed 
+bf11459c5e8f: Pushed 
+6d57d8337e10: Pushed 
+8a8aac29dc06: Pushed 
+3e556698af01: Layer already exists 
+7ec25d195c38: Layer already exists 
+a3d52d356904: Layer already exists 
+9af9a18fb5a7: Layer already exists 
+0c09dd020e8e: Layer already exists 
+fb82b029bea0: Layer already exists 
+v3: digest: sha256:587d0e0fd196e0bf931bcc2a19fb41d50c0a2ec74acfd674ab6b87ab9e08277c size: 2417
+Push image successfully.
+```
+
+- step3. 更新K8S中的镜像版本
+
+```
+root@k8s-master-1:~/k8s-data/nginx-webapp-yaml# vim nginx-webapp-deployment.yaml 
+root@k8s-master-1:~/k8s-data/nginx-webapp-yaml# cat nginx-webapp-deployment.yaml
+```
+
+```yaml
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: erp-nginx-webapp-deployment-label
+  name: erp-nginx-webapp-deployment
+  namespace: erp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: erp-nginx-webapp-selector
+  template:
+    metadata:
+      labels:
+        app: erp-nginx-webapp-selector
+    spec:
+      containers:
+        - name: erp-nginx-webapp-container
+          image: harbor.k8s.com/erp/nginx-webapp:v3
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+              protocol: TCP
+              name: http
+            - containerPort: 443
+              protocol: TCP
+              name: https
+          resources:
+            limits:
+              cpu: 300m
+              memory: 256Mi
+            requests:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: nginx-webapp-images
+              # 此处的挂载点是打镜像时创建的路径
+              mountPath: /usr/local/nginx/html/webapp/images
+              readOnly: false
+            - name: nginx-webapp-static
+              # 此处的挂载点是打镜像时创建的路径
+              mountPath: /usr/local/nginx/html/webapp/static
+              readOnly: false
+      volumes:
+        - name: nginx-webapp-images
+          nfs:
+            server: 172.16.1.189
+            path: /data/k8sdata/nginx-webapp/images
+        - name: nginx-webapp-static
+          nfs:
+            server: 172.16.1.189
+            path: /data/k8sdata/nginx-webapp/static
+```
+
+```
+root@k8s-master-1:~/k8s-data/nginx-webapp-yaml# kubectl apply -f nginx-webapp-deployment.yaml 
+deployment.apps/erp-nginx-webapp-deployment configured
+root@k8s-master-1:~/k8s-data/nginx-webapp-yaml# kubectl get pod -n erp
+NAME                                            READY   STATUS    RESTARTS   AGE
+erp-nginx-webapp-deployment-65fb86d9f6-jkswq    1/1     Running   0          16s
+erp-tomcat-webapp-deployment-84bbf6b865-wgtjj   1/1     Running   0          43m
+zookeeper1-7ff6fbfbf-j428g                      1/1     Running   0          170m
+zookeeper2-94cfd4596-9bgll                      1/1     Running   0          170m
+zookeeper3-7f55657779-h62k6                     1/1     Running   0          170m
+```
+
+- step4. 测试
+
+![nginx转发请求至tomcat](./img/nginx转发请求至tomcat.png)
+
+- step5. 为nginx配置haproxy
+
+```
+root@k8s-haproxy-1:~# vim /etc/haproxy/haproxy.cfg 
+root@k8s-haproxy-1:~# cat /etc/haproxy/haproxy.cfg
+global
+	log /dev/log	local0
+	log /dev/log	local1 notice
+	chroot /var/lib/haproxy
+	stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
+	stats timeout 30s
+	user haproxy
+	group haproxy
+	daemon
+
+	# Default SSL material locations
+	ca-base /etc/ssl/certs
+	crt-base /etc/ssl/private
+
+	# Default ciphers to use on SSL-enabled listening sockets.
+	# For more information, see ciphers(1SSL). This list is from:
+	#  https://hynek.me/articles/hardening-your-web-servers-ssl-ciphers/
+	# An alternative list with additional directives can be obtained from
+	#  https://mozilla.github.io/server-side-tls/ssl-config-generator/?server=haproxy
+	ssl-default-bind-ciphers ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:RSA+AESGCM:RSA+AES:!aNULL:!MD5:!DSS
+	ssl-default-bind-options no-sslv3
+
+defaults
+	log	global
+	mode	http
+	option	httplog
+	option	dontlognull
+        timeout connect 5000
+        timeout client  50000
+        timeout server  50000
+	errorfile 400 /etc/haproxy/errors/400.http
+	errorfile 403 /etc/haproxy/errors/403.http
+	errorfile 408 /etc/haproxy/errors/408.http
+	errorfile 500 /etc/haproxy/errors/500.http
+	errorfile 502 /etc/haproxy/errors/502.http
+	errorfile 503 /etc/haproxy/errors/503.http
+	errorfile 504 /etc/haproxy/errors/504.http
+
+listen k8s-6443
+  # bind的地址即keepalived配置的IP地址
+  bind 192.168.0.118:6443
+  mode tcp
+  # server的IP地址即为kub-apiserver的节点地址 即本例中所有的k8s-master地址
+  server k8s-master-1 192.168.0.181:6443 check inter 3s fall 3 rise 5
+  server k8s-master-2 192.168.0.182:6443 check inter 3s fall 3 rise 5
+  server k8s-master-3 192.168.0.183:6443 check inter 3s fall 3 rise 5
+
+#listen erp-nginx-80
+#  bind 192.168.0.119:80
+#  mode tcp
+#  server k8s-node-1 192.168.0.191:30019 check inter 3s fall 3 rise 5
+#  server k8s-node-1 192.168.0.192:30019 check inter 3s fall 3 rise 5
+#  server k8s-node-1 192.168.0.193:30019 check inter 3s fall 3 rise 5
 
 
+listen erp-nginx-80
+  bind 192.168.0.119:80
+  mode tcp
+  server k8s-node-1 192.168.0.191:40002 check inter 3s fall 3 rise 5
+  server k8s-node-1 192.168.0.192:40002 check inter 3s fall 3 rise 5
+  server k8s-node-1 192.168.0.193:40002 check inter 3s fall 3 rise 5
+```
 
+```
+root@k8s-haproxy-1:~# systemctl restart haproxy.service
+```
 
+![访问nginx的haproxy](./img/访问nginx的haproxy.png)
 
+### 1.7 在tomcat上生成文件,并通过nginx访问
 
+- step1. 在tomcat上生成文件
+
+![在tomcat上生成文件](./img/在tomcat上生成文件.png)
+
+- step2. 在nginx上查看
+
+![在nginx上查看文件](./img/在nginx上查看文件.png)
+
+- step3. 使用浏览器访问
+
+![通过nginx访问tomcat生成的文件](./img/通过nginx访问tomcat生成的文件.png)
+
+- step4. 在存储上查看文件
+
+```
+root@k8s-haproxy-1:~# cd /data/k8sdata/nginx-webapp/images
+root@k8s-haproxy-1:/data/k8sdata/nginx-webapp/images# ll
+total 48
+drwxr-xr-x 2 root root  4096 May 10 17:43 ./
+drwxr-xr-x 4 root root  4096 Apr 27 01:47 ../
+-rw-r--r-- 1 root root 38078 Oct 14  2020 1.png
+```

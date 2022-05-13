@@ -12011,31 +12011,1073 @@ LISTEN      0            100                          [::]:25                   
 
 ## PART11. ceph使用案例
 
-讲了K8S之后再讲这部分内容
-
 ### 11.1 rbd结合k8s提供存储卷及动态存储卷使用案例
+
+让K8S中的pod的可以访问ceph中rbd提供的镜像作为存储设备,需要在ceph上创建rbd,并且让k8s node节点能够通过ceph的认证.
+
+K8S在使用ceph作为动态存储卷的时候,需要kube-controller-manager组件能够访问ceph,因此需要在包括k8s master及node节点在内的每一个node同步认证文件.
 
 #### 11.1.1 创建初始化rbd
 
+- step1. 创建存储池
+
+```
+root@ceph-deploy-1:~# ceph osd pool create k8s-rbd-pool1 32 32
+pool 'k8s-rbd-pool1' created
+```
+
+- step2. 验证存储池
+
+```
+root@ceph-deploy-1:~# ceph osd pool ls
+device_health_metrics
+myrbd1
+.rgw.root
+default.rgw.log
+default.rgw.control
+default.rgw.meta
+cephfs-metadata
+cephfs-data
+rbd-data1
+default.rgw.buckets.index
+default.rgw.buckets.data
+default.rgw.buckets.non-ec
+test_ssdpool
+k8s-rbd-pool1
+```
+
+- step3. 存储池启用rbd
+
+```
+root@ceph-deploy-1:~# ceph osd pool application enable k8s-rbd-pool1 rbd
+enabled application 'rbd' on pool 'k8s-rbd-pool1'
+```
+
+- step4. 初始化rbd
+
+```
+root@ceph-deploy-1:~# rbd pool init -p k8s-rbd-pool1
+```
+
 #### 11.1.2 创建image
+
+- step1. 创建镜像
+
+```
+root@ceph-deploy-1:~# rbd create k8s-img-img1 --size 3G --pool k8s-rbd-pool1 --image-format 2 --image-feature layering
+```
+
+- step2. 验证镜像
+
+```
+root@ceph-deploy-1:~# rbd ls --pool k8s-rbd-pool1
+k8s-img-img1
+```
+
+- step3. 验证镜像信息
+
+```
+root@ceph-deploy-1:~# rbd --image k8s-img-img1 --pool  k8s-rbd-pool1 info
+rbd image 'k8s-img-img1':
+	size 3 GiB in 768 objects
+	order 22 (4 MiB objects)
+	snapshot_count: 0
+	id: 170cbefb295a9
+	block_name_prefix: rbd_data.170cbefb295a9
+	format: 2
+	features: layering
+	op_features: 
+	flags: 
+	create_timestamp: Fri May 13 14:49:29 2022
+	access_timestamp: Fri May 13 14:49:29 2022
+	modify_timestamp: Fri May 13 14:49:29 2022
+```
 
 #### 11.1.3 客户端安装ceph-common
 
+分别在K8S master和各个node节点安装ceph-common组件包
+
+- step1. 下载key文件并添加apt源
+
+```
+root@k8s-master-1:~# wget -q -O- 'https://mirrors.aliyun.com/ceph/keys/release.asc' | sudo apt-key add -
+OK
+root@k8s-master-1:~# sudo apt-add-repository 'deb https://mirrors.aliyun.com/ceph/debian-pacific/ bionic main'
+```
+
+```
+root@k8s-master-2:~# wget -q -O- 'https://mirrors.aliyun.com/ceph/keys/release.asc' | sudo apt-key add -
+OK
+root@k8s-master-2:~# sudo apt-add-repository 'deb https://mirrors.aliyun.com/ceph/debian-pacific/ bionic main'
+```
+
+```
+root@k8s-master-3:~# wget -q -O- 'https://mirrors.aliyun.com/ceph/keys/release.asc' | sudo apt-key add -
+OK
+root@k8s-master-3:~# sudo apt-add-repository 'deb https://mirrors.aliyun.com/ceph/debian-pacific/ bionic main'
+```
+
+```
+root@k8s-node-1:~# wget -q -O- 'https://mirrors.aliyun.com/ceph/keys/release.asc' | sudo apt-key add -
+OK
+root@k8s-node-1:~# sudo apt-add-repository 'deb https://mirrors.aliyun.com/ceph/debian-pacific/ bionic main'
+```
+
+```
+root@k8s-node-2:~# wget -q -O- 'https://mirrors.aliyun.com/ceph/keys/release.asc' | sudo apt-key add -
+OK
+root@k8s-node-2:~# sudo apt-add-repository 'deb https://mirrors.aliyun.com/ceph/debian-pacific/ bionic main'
+```
+
+```
+root@k8s-node-3:~# wget -q -O- 'https://mirrors.aliyun.com/ceph/keys/release.asc' | sudo apt-key add -
+OK
+root@k8s-node-3:~# sudo apt-add-repository 'deb https://mirrors.aliyun.com/ceph/debian-pacific/ bionic main'
+```
+
+- step2. 更新软件源
+
+以下步骤需在K8S所有master节点和node节点上执行
+
+```
+root@k8s-master-1:~# apt update
+Hit:1 https://mirrors.aliyun.com/ceph/debian-octopus buster InRelease
+Hit:2 https://mirrors.aliyun.com/ceph/debian-pacific bionic InRelease          
+Hit:3 http://us.archive.ubuntu.com/ubuntu bionic InRelease                     
+Hit:4 http://security.ubuntu.com/ubuntu bionic-security InRelease            
+Hit:5 http://us.archive.ubuntu.com/ubuntu bionic-updates InRelease
+Hit:6 http://us.archive.ubuntu.com/ubuntu bionic-backports InRelease
+Reading package lists... Done
+Building dependency tree       
+Reading state information... Done
+195 packages can be upgraded. Run 'apt list --upgradable' to see them.
+```
+
+- step3. 验证ceph版本
+
+```
+root@k8s-master-1:~# apt-cache madison ceph-common
+ceph-common | 16.2.7-1bionic | https://mirrors.aliyun.com/ceph/debian-pacific bionic/main amd64 Packages
+ceph-common | 15.2.16-1~bpo10+1 | https://mirrors.aliyun.com/ceph/debian-octopus buster/main amd64 Packages
+ceph-common | 12.2.13-0ubuntu0.18.04.10 | http://us.archive.ubuntu.com/ubuntu bionic-updates/main amd64 Packages
+ceph-common | 12.2.13-0ubuntu0.18.04.10 | http://security.ubuntu.com/ubuntu bionic-security/main amd64 Packages
+ceph-common | 12.2.4-0ubuntu1 | http://us.archive.ubuntu.com/ubuntu bionic/main amd64 Packages
+```
+
+- step7. 安装ceph-common并指定版本
+
+```
+root@k8s-master-1:~# apt install ceph-common=16.2.7-1bionic -y
+...
+Processing triggers for man-db (2.8.3-2ubuntu0.1) ...
+Processing triggers for libc-bin (2.27-3ubuntu1.2) ...
+root@k8s-master-1:~# 
+```
+
 #### 11.1.4 创建ceph用户与授权
+
+- step1. 创建用户
+
+```
+root@ceph-deploy-1:~# ceph auth get-or-create client.k8s-user mon 'allow r' osd 'allow * pool=k8s-rbd-pool1'
+[client.k8s-user]
+	key = AQAkDH5i/xGNJhAAdHn2ZYPbfuBWEMkPuaPOcw==
+```
+
+- step2. 验证用户
+
+```
+root@ceph-deploy-1:~# ceph auth get client.k8s-user
+[client.k8s-user]
+	key = AQAkDH5i/xGNJhAAdHn2ZYPbfuBWEMkPuaPOcw==
+	caps mon = "allow r"
+	caps osd = "allow * pool=k8s-rbd-pool1"
+exported keyring for client.k8s-user
+```
+
+- step3. 导出用户信息至keyring文件
+
+```
+root@ceph-deploy-1:~# ceph auth get client.k8s-user -o ceph.client.k8s-user.keyring
+exported keyring for client.k8s-user
+root@ceph-deploy-1:~# cat ceph.client.k8s-user.keyring 
+[client.k8s-user]
+	key = AQAkDH5i/xGNJhAAdHn2ZYPbfuBWEMkPuaPOcw==
+	caps mon = "allow r"
+	caps osd = "allow * pool=k8s-rbd-pool1"
+root@ceph-deploy-1:~# mv ceph.client.k8s-user.keyring /home/ceph/ceph-cluster/
+```
+
+- step4. 同步认证文件到K8S各个master和node节点
+
+此处仅以同步到k8s-master-1节点为例,本操作需同步到所有K8S的master和node节点
+
+```
+root@ceph-deploy-1:/home/ceph/ceph-cluster# scp ceph.conf ceph.client.k8s-user.keyring root@192.168.0.181:/etc/ceph/
+The authenticity of host '192.168.0.181 (192.168.0.181)' can't be established.
+ECDSA key fingerprint is SHA256:tzITLmgANAQRCks+Gv9ZXsd/gNdzLSZ5tp1uWa2agP0.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added '192.168.0.181' (ECDSA) to the list of known hosts.
+root@192.168.0.181's password: 
+ceph.conf                                                                                                                                                                                                                                     100% 1078   156.3KB/s   00:00    
+ceph.client.k8s-user.keyring 
+```
+
+- step5. 在K8S node节点验证用户权限
+
+```
+root@k8s-node-1:~# ceph --user k8s-user -s
+  cluster:
+    id:     ca4d26ca-9a65-42a0-b61c-991e96d81b62
+    health: HEALTH_OK
+ 
+  services:
+    mon: 3 daemons, quorum ceph-mon-1,ceph-mon-2,ceph-mon-3 (age 8h)
+    mgr: ceph-mgr-2(active, since 10h), standbys: ceph-mgr-1
+    mds: 2/2 daemons up, 1 standby
+    osd: 12 osds: 12 up (since 11h), 12 in (since 8w)
+ 
+  data:
+    volumes: 1/1 healthy
+    pools:   14 pools, 433 pgs
+    objects: 401 objects, 329 MiB
+    usage:   1.2 GiB used, 599 GiB / 600 GiB avail
+    pgs:     433 active+clean
+```
+
+- step6. 验证镜像访问权限
+
+```
+root@k8s-node-1:~# rbd --id k8s-user ls --pool=k8s-rbd-pool1
+k8s-img-img1
+```
 
 #### 11.1.5 k8s节点配置主机名称解析
 
+在ceph.conf配置文件中包含ceph主机的主机名,因此需要在K8S各个master和node节点上配置主机名解析
+
+本步骤所有master和node节点都要做.
+
+注:此处由于我的ceph集群和k8s集群没有在同一台物理机上,所以无法通过内网访问,只能写公网IP.
+
+```
+root@k8s-node-1:~# vim /etc/hosts
+root@k8s-node-1:~# cat /etc/hosts
+127.0.0.1	localhost
+127.0.1.1	192.168.0.104	192
+
+# The following lines are desirable for IPv6 capable hosts
+::1     localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+172.16.1.184 harbor.k8s.com
+
+192.168.0.161	ceph-osd1.example.local			ceph-osd-1
+192.168.0.162	ceph-osd2.example.local			ceph-osd-2
+192.168.0.163	ceph-osd3.example.local			ceph-osd-3
+192.168.0.164	ceph-osd4.example.local			ceph-osd-4
+192.168.0.165	ceph-mon1.example.local			ceph-mon-1
+192.168.0.166	ceph-mon2.example.local			ceph-mon-2
+192.168.0.167	ceph-mon3.example.local			ceph-mon-3
+192.168.0.168	ceph-mgr1.example.local			ceph-mgr-1
+192.168.0.169	ceph-mgr2.example.local			ceph-mgr-2
+192.168.0.170	ceph-deploy1.example.local		ceph-deploy-1
+```
+
 #### 11.1.6 通过keyring文件挂载rbd
+
+基于ceph提供的rbd实现存储卷的动态提供,有2种实现方式.一种是通过宿主机的keyring文件挂载rbd,另一种是通过将keyring文件中的key定义为k8s中的secret,然后pod通过secret挂载pod.
 
 ##### 11.1.6.1 通过keyring文件直接挂载busybox
 
+- step1. 创建pod并挂载
+
+```
+root@k8s-master-1:~# mkdir ceph-case
+root@k8s-master-1:~# cd ceph-case/
+root@k8s-master-1:~/ceph-case# vim case1-busybox-keyring.yaml
+root@k8s-master-1:~/ceph-case# cat case1-busybox-keyring.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: busybox
+  namespace: default
+spec:
+  containers:
+    - image: busybox
+      command:
+        - sleep
+        - "3600"
+      imagePullPolicy: Always
+      name: busybox
+      volumeMounts:
+        - name: rbd-data1
+          mountPath: /data
+  volumes:
+    - name: rbd-data1
+      rbd:
+        monitors:
+          - '192.168.0.165:6789'
+          - '192.168.0.166:6789'
+          - '192.168.0.167:6789'
+        pool: k8s-rbd-pool1
+        image: k8s-img-img1
+        fsType: ext4
+        readOnly: false
+        user: k8s-user
+        keyring: /etc/ceph/ceph.client.k8s-user.keyring
+```
+
+```
+root@k8s-master-1:~/ceph-case# kubectl apply -f case1-busybox-keyring.yaml 
+pod/busybox created
+root@k8s-master-1:~/ceph-case# kubectl get pods
+NAME                                READY   STATUS    RESTARTS   AGE
+busybox                             1/1     Running   0          2m36s
+nginx-deployment-645fc9c5bf-stqs6   1/1     Running   1          11h
+```
+
+- step2. 验证
+
+```
+root@k8s-master-1:~/ceph-case# kubectl exec -it busybox sh
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+/ # df -h
+Filesystem                Size      Used Available Use% Mounted on
+overlay                  19.6G      5.9G     12.6G  32% /
+tmpfs                    64.0M         0     64.0M   0% /dev
+tmpfs                   985.1M         0    985.1M   0% /sys/fs/cgroup
+/dev/rbd0                 2.9G      9.0M      2.9G   0% /data
+/dev/sda1                19.6G      5.9G     12.6G  32% /dev/termination-log
+/dev/sda1                19.6G      5.9G     12.6G  32% /etc/resolv.conf
+/dev/sda1                19.6G      5.9G     12.6G  32% /etc/hostname
+/dev/sda1                19.6G      5.9G     12.6G  32% /etc/hosts
+shm                      64.0M         0     64.0M   0% /dev/shm
+tmpfs                   985.1M     12.0K    985.1M   0% /var/run/secrets/kubernetes.io/serviceaccount
+tmpfs                   985.1M         0    985.1M   0% /proc/acpi
+tmpfs                    64.0M         0     64.0M   0% /proc/kcore
+tmpfs                    64.0M         0     64.0M   0% /proc/keys
+tmpfs                    64.0M         0     64.0M   0% /proc/timer_list
+tmpfs                    64.0M         0     64.0M   0% /proc/sched_debug
+tmpfs                   985.1M         0    985.1M   0% /proc/scsi
+tmpfs                   985.1M         0    985.1M   0% /sys/firmware
+```
+
+`/dev/rbd0`即为ceph的块存储
+
+- step3. 向rbd中写入数据
+
+```
+/ # touch /data/test.txt
+/ # echo "123" >> /data/test.txt 
+```
+
+实际上pod的挂载是宿主机的内核实现的.
+
+```
+root@k8s-node-1:~# df -TH
+Filesystem     Type      Size  Used Avail Use% Mounted on
+...
+/dev/rbd0      ext4      3.2G  9.5M  3.1G   1% /var/lib/kubelet/plugins/kubernetes.io/rbd/mounts/k8s-rbd-pool1-image-k8s-img-img1
+```
+
+- step4. 删除pod
+
+由于存储池中只有1个image,故需要先删除pod,才能再让其他pod挂载
+
+```
+root@k8s-master-1:~/ceph-case# kubectl delete -f case1-busybox-keyring.yaml
+```
+
 ##### 11.1.6.2 通过keyring文件直接挂载nginx
+
+- step1. 创建pod
+
+```
+root@k8s-master-1:~/ceph-case# vim case2-nginx-keyring.yaml 
+root@k8s-master-1:~/ceph-case# cat case2-nginx-keyring.yaml
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-ceph-deployment
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ng-deploy-80
+  template:
+    metadata:
+      labels:
+        app: ng-deploy-80
+    spec:
+      containers:
+        - name: ng-deploy-80
+          image: harbor.k8s.com/erp/nginx:1.16.1
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: rbd-data1
+              mountPath: /data
+      volumes:
+        - name: rbd-data1
+          rbd:
+            monitors:
+              - '192.168.0.165:6789'
+              - '192.168.0.166:6789'
+              - '192.168.0.167:6789'
+            pool: k8s-rbd-pool1
+            image: k8s-img-img1
+            fsType: ext4
+            readOnly: false
+            user: k8s-user
+            keyring: /etc/ceph/ceph.client.k8s-user.keyring
+```
+
+```
+root@k8s-master-1:~/ceph-case# kubectl apply -f case2-nginx-keyring.yaml 
+deployment.apps/nginx-ceph-deployment created
+root@k8s-master-1:~/ceph-case# kubectl get pod
+NAME                                     READY   STATUS    RESTARTS   AGE
+nginx-ceph-deployment-55f8586976-9hlhm   1/1     Running   0          15s
+nginx-deployment-645fc9c5bf-stqs6        1/1     Running   1          12h
+```
+
+- step2. 验证
+
+```
+root@k8s-master-1:~/ceph-case# kubectl exec -it nginx-ceph-deployment-55f8586976-9hlhm sh
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+# df -h
+Filesystem      Size  Used Avail Use% Mounted on
+overlay          20G  6.0G   13G  32% /
+tmpfs            64M     0   64M   0% /dev
+tmpfs           986M     0  986M   0% /sys/fs/cgroup
+/dev/rbd0       2.9G  9.1M  2.9G   1% /data
+/dev/sda1        20G  6.0G   13G  32% /etc/hosts
+shm              64M     0   64M   0% /dev/shm
+tmpfs           986M   12K  986M   1% /run/secrets/kubernetes.io/serviceaccount
+tmpfs           986M     0  986M   0% /proc/acpi
+tmpfs           986M     0  986M   0% /proc/scsi
+tmpfs           986M     0  986M   0% /sys/firmware
+# cat /data/test.txt    
+123
+```
+
+- step3. 向rbd中写入数据
+
+```
+# echo "456" >> /data/test.txt
+# cat /data/test.txt
+123
+456
+```
+
+- step4. 删除pod
+
+```
+root@k8s-master-1:~/ceph-case# kubectl delete -f case2-nginx-keyring.yaml 
+deployment.apps "nginx-ceph-deployment" deleted
+```
 
 ##### 11.1.6.3 宿主机验证rbd
 
+从pod的视角来看,rbd是挂载到了pod.但是由于pod使用的是宿主机的内核,因此实际上是在宿主机上挂载的
+
+- step1. 创建一个pod并挂载
+
+```
+root@k8s-master-1:~/ceph-case# kubectl apply -f case2-nginx-keyring.yaml 
+deployment.apps/nginx-ceph-deployment created
+root@k8s-master-1:~/ceph-case# kubectl get pod -o wide
+NAME                                     READY   STATUS    RESTARTS   AGE   IP              NODE            NOMINATED NODE   READINESS GATES
+nginx-ceph-deployment-55f8586976-wtknk   1/1     Running   0          43s   10.200.109.88   192.168.0.191   <none>           <none>
+nginx-deployment-645fc9c5bf-stqs6        1/1     Running   1          13h   10.200.76.150   192.168.0.193   <none>           <none>
+```
+
+- step2. 查看rbd使用情况
+
+```
+root@k8s-node-1:~# rbd showmapped
+id  pool           namespace  image         snap  device   
+0   k8s-rbd-pool1             k8s-img-img1  -     /dev/rbd0
+```
+
+- step3. 删除pod
+
+```
+root@k8s-master-1:~/ceph-case# kubectl delete -f case2-nginx-keyring.yaml 
+deployment.apps "nginx-ceph-deployment" deleted
+```
+
 #### 11.1.7 通过secret挂载rbd
+
+将key先定义为secret,然后再挂载至pod.这样一来每个K8S的master和node节点就不再需要保存keyring文件了.
 
 ##### 11.1.7.1 创建secret
 
+首先要创建secret,secret中主要就是包含ceph中被授权用户的keyring文件中的key.需要将这个key进行base64编码后,即可创建secret.
 
+- step1. 将key进行base64编码
 
+```
+root@ceph-deploy-1:/home/ceph/ceph-cluster# ceph auth print-key client.k8s-user
+AQAkDH5i/xGNJhAAdHn2ZYPbfuBWEMkPuaPOcw==
+root@ceph-deploy-1:/home/ceph/ceph-cluster# ceph auth print-key client.k8s-user|base64
+QVFBa0RINWkveEdOSmhBQWRIbjJaWVBiZnVCV0VNa1B1YVBPY3c9PQ==
+```
+
+注:base64解密方式
+
+```
+root@ceph-deploy-1:/home/ceph/ceph-cluster# echo QVFBa0RINWkveEdOSmhBQWRIbjJaWVBiZnVCV0VNa1B1YVBPY3c9PQ==|base64 -d
+AQAkDH5i/xGNJhAAdHn2ZYPbfuBWEMkPuaPOcw==
+```
+
+- step2. 创建secret
+
+secret是将某些密钥放入K8S中,供给pod使用的一种方式.
+
+```
+root@k8s-master-1:~/ceph-case# vim case3-secret-client-k8s-user.yaml
+root@k8s-master-1:~/ceph-case# cat case3-secret-client-k8s-user.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  # secret的名称 后续通过该名称来确定secret
+  name: ceph-secret-k8s-user
+type: "kubernetes.io/rbd"
+data:
+  key: QVFBa0RINWkveEdOSmhBQWRIbjJaWVBiZnVCV0VNa1B1YVBPY3c9PQ==
+```
+
+```
+root@k8s-master-1:~/ceph-case# kubectl apply -f case3-secret-client-k8s-user.yaml 
+secret/ceph-secret-k8s-user created
+root@k8s-master-1:~/ceph-case# kubectl get secrets
+NAME                   TYPE                                  DATA   AGE
+ceph-secret-k8s-user   kubernetes.io/rbd                     1      7s
+default-token-wq9t4    kubernetes.io/service-account-token   3      20d
+```
+
+##### 11.1.7.2 创建pod
+
+```
+root@k8s-master-1:~/ceph-case# vim case4-nginx-secret.yaml 
+root@k8s-master-1:~/ceph-case# cat case4-nginx-secret.yaml
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-ceph-secret-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ng-secret-deploy-80
+  template:
+    metadata:
+      labels:
+        app: ng-secret-deploy-80
+    spec:
+      containers:
+        - name: ng-secret-deploy-80
+          image: harbor.k8s.com/erp/nginx:1.16.1
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: rbd-data1
+              mountPath: /data
+      volumes:
+        - name: rbd-data1
+          rbd:
+            monitors:
+              - '192.168.0.165:6789'
+              - '192.168.0.166:6789'
+              - '192.168.0.167:6789'
+            pool: k8s-rbd-pool1
+            image: k8s-img-img1
+            fsType: ext4
+            readOnly: false
+            user: k8s-user
+            # 使用secret认证
+            secretRef:
+              name: ceph-secret-k8s-user
+```
+
+```
+root@k8s-master-1:~/ceph-case# kubectl apply -f case4-nginx-secret.yaml 
+deployment.apps/nginx-ceph-secret-deployment created
+root@k8s-master-1:~/ceph-case# kubectl get pod
+NAME                                            READY   STATUS    RESTARTS   AGE
+nginx-ceph-secret-deployment-844b77b6dc-xq8q9   1/1     Running   0          29s
+nginx-deployment-645fc9c5bf-stqs6               1/1     Running   1          13h
+```
+
+##### 11.1.7.3 pod验证挂载
+
+- step1. 验证
+
+```
+root@k8s-master-1:~/ceph-case# kubectl exec -it nginx-ceph-secret-deployment-844b77b6dc-xq8q9 sh
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+# df -h
+Filesystem      Size  Used Avail Use% Mounted on
+overlay          20G  6.0G   13G  32% /
+tmpfs            64M     0   64M   0% /dev
+tmpfs           986M     0  986M   0% /sys/fs/cgroup
+/dev/rbd0       2.9G  9.1M  2.9G   1% /data
+/dev/sda1        20G  6.0G   13G  32% /etc/hosts
+shm              64M     0   64M   0% /dev/shm
+tmpfs           986M   12K  986M   1% /run/secrets/kubernetes.io/serviceaccount
+tmpfs           986M     0  986M   0% /proc/acpi
+tmpfs           986M     0  986M   0% /proc/scsi
+tmpfs           986M     0  986M   0% /sys/firmware
+# cat /data/test.txt
+123
+456
+```
+
+- step2. 删除pod
+
+```
+root@k8s-master-1:~/ceph-case# kubectl delete -f case4-nginx-secret.yaml 
+deployment.apps "nginx-ceph-secret-deployment" deleted
+```
+
+##### 11.1.7.4 宿主机验证挂载
+
+#### 11.1.8 动态存储卷供给-需要使用二进制安装K8S
+
+由于需要动态创建PV,所以需要ceph的admin用户权限(用于调用ceph动态创建PV).因此先创建admin用户的secret.
+
+对于K8S而言,需要master节点以ceph的admin用户连接到ceph创建PV;需要node节点以ceph的普通用户身份挂载rbd.因此K8S需要两种用户的key信息.
+
+实际上PV就是ceph的rbd存储池中的一个image.PVC会关联到自己创建的PV上.
+
+##### 11.1.8.1 创建admin用户secret
+
+- step1. 获取admin用户的key并进行base64加密
+
+```
+root@ceph-deploy-1:/home/ceph/ceph-cluster# ceph auth print-key client.admin
+AQCeVSdijiOFGhAA8Sup9qfOmAYgt1zxRcw5kg==
+root@ceph-deploy-1:/home/ceph/ceph-cluster# ceph auth print-key client.admin|base64
+QVFDZVZTZGlqaU9GR2hBQThTdXA5cWZPbUFZZ3QxenhSY3c1a2c9PQ==
+```
+
+- step2. 创建admin的secret
+
+```
+root@k8s-master-1:~/ceph-case# vim case5-secret-admin.yaml 
+root@k8s-master-1:~/ceph-case# cat case5-secret-admin.yaml
+```
+
+```yaml 
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ceph-secret-admin
+type: "kubernetes.io/rbd"
+data:
+  key: QVFDZVZTZGlqaU9GR2hBQThTdXA5cWZPbUFZZ3QxenhSY3c1a2c9PQ==
+```
+
+```
+root@k8s-master-1:~/ceph-case# kubectl apply -f case5-secret-admin.yaml 
+secret/ceph-secret-admin created
+root@k8s-master-1:~/ceph-case# kubectl get secrets 
+NAME                   TYPE                                  DATA   AGE
+ceph-secret-admin      kubernetes.io/rbd                     1      5s
+ceph-secret-k8s-user   kubernetes.io/rbd                     1      18m
+default-token-wq9t4    kubernetes.io/service-account-token   3      20d
+```
+
+##### 11.1.8.2 创建普通用户的secret
+
+之前已经创建过一个k8s-user用户的secret了.
+
+##### 11.1.8.3 创建存储类
+
+```
+root@k8s-master-1:~/ceph-case# vim case6-ceph-storage-class.yaml 
+root@k8s-master-1:~/ceph-case# cat case6-ceph-storage-class.yaml
+```
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  # 存储类的名称 PVC通过该名称关联到该存储类
+  name: ceph-storage-class-k8s-user
+  namespace: default
+  annotations:
+    # 设置为默认存储类
+    # 若设置为存储类 则后续创建存储类时 都默认创建为ceph的存储类
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: kubernetes.io/rbd
+# 认证信息
+parameters:
+  monitors: 192.168.0.165:6789,192.168.0.166:6789,192.168.0.167:6789
+  adminId: admin
+  adminSecretName: ceph-secret-admin
+  adminSecretNamespace: default
+  # ceph中存储池的名称 此处仅指定存储池名称即可 存储类会自行创建镜像
+  # 这也是需要admin权限的原因
+  pool: k8s-rbd-pool1
+  # 镜像创建好后 给pod挂载时 会使用ceph的普通用户挂载
+  userId: k8s-user
+  userSecretName: ceph-secret-k8s-user
+  userSecretNamespace: default
+```
+
+```
+root@k8s-master-1:~/ceph-case# kubectl apply -f case6-ceph-storage-class.yaml 
+storageclass.storage.k8s.io/ceph-storage-class-k8s-user created
+root@k8s-master-1:~/ceph-case# kubectl get storageclasses
+NAME                          PROVISIONER         RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+ceph-storage-class-k8s-user   kubernetes.io/rbd   Delete          Immediate           false                  17s
+```
+
+##### 11.1.8.4 创建基于存储类的PVC
+
+- step1. 查看创建PVC前,存储池中的镜像
+
+```
+root@ceph-deploy-1:/home/ceph/ceph-cluster# rbd ls --pool k8s-rbd-pool1
+k8s-img-img1
+```
+
+- step2. 创建PVC
+
+```
+root@k8s-master-1:~/ceph-case# vim case7-mysql-pvc.yaml 
+root@k8s-master-1:~/ceph-case# cat case7-mysql-pvc.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  # PVC的名称
+  name: mysql-data-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  # StorageClass的名称
+  storageClassName: ceph-storage-class-k8s-user
+  resources:
+    requests:
+      storage: '5Gi'
+```
+
+```
+root@k8s-master-1:~/ceph-case# kubectl get pvc
+NAME             STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS                  AGE
+mysql-data-pvc   Bound    pvc-6c711e3a-1251-435f-95ac-b1867cafc8b4   5Gi        RWO            ceph-storage-class-k8s-user   3s
+```
+
+- step3. 创建PVC后,查看存储池中的镜像
+
+```
+root@ceph-deploy-1:/home/ceph/ceph-cluster# rbd ls --pool k8s-rbd-pool1
+k8s-img-img1
+kubernetes-dynamic-pvc-018bd798-75c4-471a-9e7e-c9c4cb5712e5
+```
+
+##### 11.1.8.5 运行单机mysql并验证
+
+- step1. 创建pod
+
+```
+root@k8s-master-1:~/ceph-case# vim case8-mysql-deployment.yaml 
+root@k8s-master-1:~/ceph-case# cat case8-mysql-deployment.yaml
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-deployment
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - image: harbor.k8s.com/erp/mysql:5.6.46
+          name: mysql
+          env:
+            # 不设置root用户的密码是无法运行该镜像的
+            - name: MYSQL_ROOT_PASSWORD
+              value: erp123456
+          ports:
+            - containerPort: 3306
+              name: mysql
+          volumeMounts:
+            - name: mysql-persistent-storage
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mysql-persistent-storage
+          persistentVolumeClaim:
+            claimName: mysql-data-pvc
+```
+
+```
+root@k8s-master-1:~/ceph-case# kubectl apply -f case8-mysql-deployment.yaml 
+deployment.apps/mysql-deployment created
+root@k8s-master-1:~/ceph-case# kubectl get pod
+NAME                                READY   STATUS    RESTARTS   AGE
+mysql-deployment-7f8cd5784-dmh6f    1/1     Running   0          2m9s
+nginx-deployment-645fc9c5bf-stqs6   1/1     Running   1          15h
+```
+
+- step2. 创建service
+
+```
+root@k8s-master-1:~/ceph-case# vim case9-mysql-service.yaml 
+root@k8s-master-1:~/ceph-case# cat case9-mysql-service.yaml
+```
+
+```yaml
+kind: Service
+apiVersion: v1
+metadata:
+  labels:
+    app: mysql-service-label
+  name: mysql-service
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 3306
+      protocol: TCP
+      targetPort: 3306
+      nodePort: 43306
+  selector:
+    app: mysql
+```
+
+```
+root@k8s-master-1:~/ceph-case# kubectl apply -f case9-mysql-service.yaml 
+service/mysql-service created
+root@k8s-master-1:~/ceph-case# kubectl get svc
+NAME            TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
+kubernetes      ClusterIP   10.100.0.1     <none>        443/TCP          20d
+mysql-service   NodePort    10.100.50.92   <none>        3306:43306/TCP   5s
+ng-deploy-80    NodePort    10.100.32.30   <none>        81:30019/TCP     19d
+```
+
+- step3. 进入容器验证
+
+```
+root@k8s-master-1:~/ceph-case# kubectl exec -it mysql-deployment-7f8cd5784-dmh6f bash
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+root@mysql-deployment-7f8cd5784-dmh6f:/# df -h
+Filesystem      Size  Used Avail Use% Mounted on
+overlay          20G  6.3G   13G  34% /
+tmpfs            64M     0   64M   0% /dev
+tmpfs           986M     0  986M   0% /sys/fs/cgroup
+/dev/sda1        20G  6.3G   13G  34% /etc/hosts
+shm              64M     0   64M   0% /dev/shm
+/dev/rbd0       4.9G  131M  4.8G   3% /var/lib/mysql
+tmpfs           986M   12K  986M   1% /run/secrets/kubernetes.io/serviceaccount
+tmpfs           986M     0  986M   0% /proc/acpi
+tmpfs           986M     0  986M   0% /proc/scsi
+tmpfs           986M     0  986M   0% /sys/firmware
+```
+
+- step4. 查看ceph使用情况
+
+```
+root@ceph-deploy-1:/home/ceph/ceph-cluster# ceph df
+--- RAW STORAGE ---
+CLASS     SIZE    AVAIL     USED  RAW USED  %RAW USED
+hdd    600 GiB  598 GiB  2.0 GiB   2.0 GiB       0.33
+TOTAL  600 GiB  598 GiB  2.0 GiB   2.0 GiB       0.33
+ 
+--- POOLS ---
+POOL                        ID  PGS   STORED  OBJECTS     USED  %USED  MAX AVAIL
+device_health_metrics        1    1      0 B        0      0 B      0    189 GiB
+myrbd1                       3   64   77 MiB       44  230 MiB   0.04    189 GiB
+.rgw.root                    4   32  1.3 KiB        4   48 KiB      0    189 GiB
+default.rgw.log              5   32  3.6 KiB      209  408 KiB      0    189 GiB
+default.rgw.control          6   32      0 B        8      0 B      0    189 GiB
+default.rgw.meta             7    8    906 B        5   48 KiB      0    189 GiB
+cephfs-metadata              8   32  107 KiB       42  480 KiB      0    189 GiB
+cephfs-data                  9   64  490 KiB        2  1.5 MiB      0    189 GiB
+rbd-data1                   13   32  200 MiB       69  600 MiB   0.10    189 GiB
+default.rgw.buckets.index   14    8   16 KiB       11   48 KiB      0    189 GiB
+default.rgw.buckets.data    15   32   11 MiB        3   34 MiB      0    189 GiB
+default.rgw.buckets.non-ec  16   32  3.0 KiB        0  9.0 KiB      0    189 GiB
+test_ssdpool                17   32      0 B        0      0 B      0     63 GiB
+k8s-rbd-pool1               18   32  243 MiB       91  728 MiB   0.13    189 GiB
+```
+
+可以看到,存储池k8s-rbd-pool1已经使用了728MB.
+
+#### 11.1.9 cephfs使用案例
+
+##### 11.1.9.1 创建secret
+
+```
+root@k8s-master-1:~/ceph-case# kubectl apply -f case5-secret-admin.yaml
+secret/ceph-secret-admin created
+root@k8s-master-1:~/ceph-case# kubectl get secrets 
+NAME                  TYPE                                  DATA   AGE
+ceph-secret-admin     kubernetes.io/rbd                     1      6s
+default-token-wq9t4   kubernetes.io/service-account-token   3      20d
+```
+
+##### 11.1.9.2 拷贝admin用户的keyring文件至K8S的node节点
+
+```
+root@ceph-deploy-1:/home/ceph/ceph-cluster# scp ceph.client.admin.keyring root@192.168.0.191:/etc/ceph/
+root@192.168.0.191's password: 
+ceph.client.admin.keyring                                                                                                                                                                                                                     100%  151     5.0KB/s   00:00    
+root@ceph-deploy-1:/home/ceph/ceph-cluster# scp ceph.client.admin.keyring root@192.168.0.192:/etc/ceph/
+root@192.168.0.192's password: 
+ceph.client.admin.keyring                                                                                                                                                                                                                     100%  151    12.1KB/s   00:00    
+root@ceph-deploy-1:/home/ceph/ceph-cluster# scp ceph.client.admin.keyring root@192.168.0.193:/etc/ceph/
+root@192.168.0.193's password: 
+ceph.client.admin.keyring 
+```
+
+##### 11.1.9.3 创建pod
+
+```
+root@k8s-master-1:~/ceph-case# vim case10-nginx-cephfs.yaml 
+root@k8s-master-1:~/ceph-case# cat case10-nginx-cephfs.yaml
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-cephfs-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ng-cephfs-deploy-80
+  template:
+    metadata:
+      labels:
+        app: ng-cephfs-deploy-80
+    spec:
+      containers:
+        - name: ng-cephfs-deploy-80
+          image: harbor.k8s.com/erp/nginx:1.16.1
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: erp-staticdata-cephfs
+              mountPath: /usr/share/nginx/html/
+      volumes:
+        - name: erp-staticdata-cephfs
+          # 存储卷类型为cephfs
+          cephfs:
+            monitors:
+              - '192.168.0.165:6789'
+              - '192.168.0.166:6789'
+              - '192.168.0.167:6789'
+            path: /
+            user: admin
+            secretRef:
+              name: ceph-secret-admin
+```
+
+```
+root@k8s-master-1:~/ceph-case# kubectl apply -f case10-nginx-cephfs.yaml 
+deployment.apps/nginx-cephfs-deployment created
+root@k8s-master-1:~/ceph-case# kubectl get pod
+NAME                                       READY   STATUS    RESTARTS   AGE
+nginx-cephfs-deployment-7b7ffb957b-d2jjw   1/1     Running   0          3s
+nginx-cephfs-deployment-7b7ffb957b-qc5f7   1/1     Running   0          3s
+nginx-cephfs-deployment-7b7ffb957b-qzt5f   1/1     Running   0          3s
+nginx-deployment-645fc9c5bf-stqs6          1/1     Running   1          15h
+```
+
+##### 11.1.9.4 pod验证挂载
+
+- step1. 验证挂载
+
+```
+root@k8s-master-1:~/ceph-case# kubectl exec -it nginx-cephfs-deployment-7b7ffb957b-d2jjw  bash
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+root@nginx-cephfs-deployment-7b7ffb957b-d2jjw:/# df -TH
+Filesystem                                                 Type     Size  Used Avail Use% Mounted on
+overlay                                                    overlay   22G  6.7G   14G  34% /
+tmpfs                                                      tmpfs     68M     0   68M   0% /dev
+tmpfs                                                      tmpfs    1.1G     0  1.1G   0% /sys/fs/cgroup
+/dev/sda1                                                  ext4      22G  6.7G   14G  34% /etc/hosts
+shm                                                        tmpfs     68M     0   68M   0% /dev/shm
+192.168.0.165:6789,192.168.0.166:6789,192.168.0.167:6789:/ ceph     204G     0  204G   0% /usr/share/nginx/html
+tmpfs                                                      tmpfs    1.1G   13k  1.1G   1% /run/secrets/kubernetes.io/serviceaccount
+tmpfs                                                      tmpfs    1.1G     0  1.1G   0% /proc/acpi
+tmpfs                                                      tmpfs    1.1G     0  1.1G   0% /proc/scsi
+tmpfs                                                      tmpfs    1.1G     0  1.1G   0% /sys/firmware
+root@nginx-cephfs-deployment-7b7ffb957b-d2jjw:/# ls /usr/share/nginx/html/
+kern.log  test.txt
+```
+
+- step2. 写入数据
+
+```
+root@nginx-cephfs-deployment-7b7ffb957b-d2jjw:/# echo "cephfs nginx" >> /usr/share/nginx/html/index.html
+```
+
+##### 11.1.9.5 pod多副本验证
+
+在其他2个pod上查看:
+
+```
+root@k8s-master-1:~/ceph-case# kubectl exec -it nginx-cephfs-deployment-7b7ffb957b-qc5f7 bash
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+root@nginx-cephfs-deployment-7b7ffb957b-qc5f7:/# cat /usr/share/nginx/html/index.html 
+cephfs nginx
+```
+
+```
+root@k8s-master-1:~/ceph-case# kubectl exec -it nginx-cephfs-deployment-7b7ffb957b-qzt5f bash
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+root@nginx-cephfs-deployment-7b7ffb957b-qzt5f:/# cat /usr/share/nginx/html/index.html 
+cephfs nginx
+```
+
+##### 11.1.9.6 宿主机验证
+
+```
+root@k8s-master-1:~/ceph-case# kubectl get pod -o wide
+NAME                                       READY   STATUS    RESTARTS   AGE     IP              NODE            NOMINATED NODE   READINESS GATES
+nginx-cephfs-deployment-7b7ffb957b-d2jjw   1/1     Running   0          8m24s   10.200.109.92   192.168.0.191   <none>           <none>
+nginx-cephfs-deployment-7b7ffb957b-qc5f7   1/1     Running   0          8m24s   10.200.109.93   192.168.0.191   <none>           <none>
+nginx-cephfs-deployment-7b7ffb957b-qzt5f   1/1     Running   0          8m24s   10.200.109.91   192.168.0.191   <none>           <none>
+nginx-deployment-645fc9c5bf-stqs6          1/1     Running   1          15h     10.200.76.150   192.168.0.193   <none>           <none>
+```
+
+```
+root@k8s-node-1:~# df -TH
+Filesystem                                                 Type      Size  Used Avail Use% Mounted on
+...
+192.168.0.165:6789,192.168.0.166:6789,192.168.0.167:6789:/ ceph      204G     0  204G   0% /var/lib/kubelet/pods/57ababf2-1b4d-4f65-ac96-0761d2730762/volumes/kubernetes.io~cephfs/erp-staticdata-cephfs
+```
+
+若要删除基于PVC和cephfs创建的pod,则需先删除pod,再删除pvc,再删除pv,最后删除secret.

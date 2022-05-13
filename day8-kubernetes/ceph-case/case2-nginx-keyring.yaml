@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-ceph-deployment
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ng-deploy-80
+  template:
+    metadata:
+      labels:
+        app: ng-deploy-80
+    spec:
+      containers:
+        - name: ng-deploy-80
+          image: harbor.k8s.com/erp/nginx:1.16.1
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: rbd-data1
+              mountPath: /data
+      volumes:
+        - name: rbd-data1
+          rbd:
+            monitors:
+              - '192.168.0.165:6789'
+              - '192.168.0.166:6789'
+              - '192.168.0.167:6789'
+            pool: k8s-rbd-pool1
+            image: k8s-img-img1
+            fsType: ext4
+            readOnly: false
+            user: k8s-user
+            keyring: /etc/ceph/ceph.client.k8s-user.keyring

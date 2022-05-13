@@ -1,0 +1,23 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  # 存储类的名称 PVC通过该名称关联到该存储类
+  name: ceph-storage-class-k8s-user
+  annotations:
+    # 设置为默认存储类
+    # 若设置为存储类 则后续创建存储类时 都默认创建为ceph的存储类
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: kubernetes.io/rbd
+# 认证信息
+parameters:
+  monitors: 192.168.0.165:6789,192.168.0.166:6789,192.168.0.167:6789
+  adminId: admin
+  adminSecretName: ceph-secret-admin
+  adminSecretNamespace: default
+  # ceph中存储池的名称 此处仅指定存储池名称即可 存储类会自行创建镜像
+  # 这也是需要admin权限的原因
+  pool: k8s-rbd-pool1
+  # 镜像创建好后 给pod挂载时 会使用ceph的普通用户挂载
+  userId: k8s-user
+  userSecretName: ceph-secret-k8s-user
+  userSecretNamespace: default

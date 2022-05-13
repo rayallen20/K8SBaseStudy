@@ -2482,3 +2482,9 @@ drwxr-xr-x 2 root root  4096 May 10 17:43 ./
 drwxr-xr-x 4 root root  4096 Apr 27 01:47 ../
 -rw-r--r-- 1 root root 38078 Oct 14  2020 1.png
 ```
+
+## PART2. ceph + k8s
+
+本部分见day2笔记PART11和PART12
+
+## PART3. Pod状态和探针

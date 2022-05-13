@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-cephfs-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ng-cephfs-deploy-80
+  template:
+    metadata:
+      labels:
+        app: ng-cephfs-deploy-80
+    spec:
+      containers:
+        - name: ng-cephfs-deploy-80
+          image: harbor.k8s.com/erp/nginx:1.16.1
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: erp-staticdata-cephfs
+              mountPath: /usr/share/nginx/html/ # /data/nginx/static
+      volumes:
+        - name: erp-staticdata-cephfs
+          # 存储卷类型为cephfs
+          cephfs:
+            monitors:
+              - '192.168.0.165:6789'
+              - '192.168.0.166:6789'
+              - '192.168.0.167:6789'
+            path: /
+            user: admin
+            secretRef:
+              name: ceph-secret-admin

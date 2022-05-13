@@ -2485,6 +2485,6 @@ drwxr-xr-x 4 root root  4096 Apr 27 01:47 ../
 
 ## PART2. ceph + k8s
 
-本部分见day2笔记PART11和PART12
+本部分见day2笔记[PART11](https://github.com/rayallen20/K8SBaseStudy/blob/master/day2-ceph-and-docker/day2-ceph.md#part11-ceph%E4%BD%BF%E7%94%A8%E6%A1%88%E4%BE%8B).
 
 ## PART3. Pod状态和探针

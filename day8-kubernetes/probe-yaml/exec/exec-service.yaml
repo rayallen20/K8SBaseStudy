@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-exec-service
+spec:
+  ports:
+  - name: http
+    port: 6379
+    targetPort: 6379
+    nodePort: 40016
+    protocol: TCP
+  type: NodePort
+  selector:
+    app: redis-exec-deploy

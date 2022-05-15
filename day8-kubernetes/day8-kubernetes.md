@@ -2488,3 +2488,1014 @@ drwxr-xr-x 4 root root  4096 Apr 27 01:47 ../
 本部分见day2笔记[PART11](https://github.com/rayallen20/K8SBaseStudy/blob/master/day2-ceph-and-docker/day2-ceph.md#part11-ceph%E4%BD%BF%E7%94%A8%E6%A1%88%E4%BE%8B).
 
 ## PART3. Pod状态和探针
+
+[Pod状态和探针](https://kubernetes.io/zh/docs/concepts/workloads/pods/pod-lifecycle/)
+
+### 3.1 Pod状态
+
+![Pod状态](./img/Pod状态.png)
+
+- 第一阶段
+
+	- Pending:正在创建Pod,但Pod中的容器还没有被全部创建完成.处于此状态的Pod应该检查Pod依赖的存储是否有挂载权限、镜像是否可以下载、调度是否正常等
+	- Failed:Pod中有容器启动失败而导致Pod工作异常
+	- Unknown:由于某种原因无法获得Pod的当前状态.通常是由于与Pod所在的node节点通信错误(即node节点上的kubelet和master通信失败)的原因
+	- Succeeded:Pod中所有容器都被成功终止,即Pod中的所有container均已terminated
+
+- 第二阶段
+
+	- Unschedulable:Pod不能被调度,kube-scheduler没有匹配到合适的node节点
+	- PodScheduled:pod正处于调度中,在kube-scheduler刚开始调度时,还没有将pod分配到指定的node,在筛选出合适的节点后就会更新etcd数据,将pod分配到指定的node
+	- Initialized:所有pod中的初始化容器已经完成了
+	- ImagePullBackOff:Pod所在的node节点下载镜像失败
+	- Running:Pod内部的容器已经被创建并且启动
+	- Ready:表示Pod中的容器已经可以提供服务
+
+![Pod状态分析](./img/Pod状态分析.png)
+
+状态列表:
+
+- Error:Pod启动过程中发生错误 
+- NodeLost:Pod所在节点失联
+- Unkown:Pod所在节点失联或其它未知异常
+- Waiting:Pod等待启动
+- Pending:Pod等待被调度
+- Terminating:Pod正在被销毁
+- CrashLoopBackOff:Pod挂了,但是kubelet正在将它重启.通常在配置了探针之后才会出现这种状态.
+- InvalidImageName:node节点无法解析镜像名称导致的镜像无法下载
+- ImageInspectError:无法校验镜像,镜像不完整导致
+- ErrImageNeverPull:策略禁止拉取镜像,镜像中心权限是私有等
+- ImagePullBackOff:镜像拉取失败,但是正在重新拉取. ErrImageNeverPull错误是连不上镜像仓库, ImagePullBackOff是能连上镜像仓库但是下载慢导致的错误,但是会重试.
+- RegistryUnavailable:镜像服务器不可用,网络原因或harbor宕机
+- ErrImagePull:镜像拉取出错,超时或下载被强制终止
+- CreateContainerConfigError:不能创建kubelet使用的容器配置
+- CreateContainerError:创建容器失败
+- PreStartContainer:执行preStart hook报错,Pod hook(钩子)是由Kubernetes管理的kubelet发起的,当容器中的进程启动前或者容器中的进程终止之前运行,比如容器创建完成后里面的服务启动之前可以检查一下依赖的其它服务是否启动,或者容器退出之前可以把容器中的服务先通过命令停止
+- PostStartHookError:执行postStart hook报错
+- RunContainerError:pod运行失败,容器中没有初始化PID为1的守护进程等.容器没有内核,因此如果没有PID为1的进程,就相当于容器执行了一个单次任务,执行完毕后容器就会销毁.因此容器必须有PID为1的进程.
+- ContainersNotInitialized:Pod没有初始化完毕 
+- ContainersNotReady:Pod没有准备完毕
+- ContainerCreating:Pod正在创建中
+- PodInitializing:Pod正在初始化中
+- DockerDaemonNotReady:node节点decker服务没有启动
+- NetworkPluginNotReady:网络插件还没有完全启动
+
+### 3.2 Pod探针
+
+[Pod探针](https://kubernetes.io/zh/docs/concepts/workloads/pods/pod-lifecycle/#container-probes)
+
+#### 3.2.1 探针简介
+
+探针是由kubelet发起的对容器执行定期诊断,以保证Pod的状态始终处于运行状态,要执行诊断,kubelet调用由容器实现的Handler(处理程序),有三种类型的处理程序:
+
+- ExecAction:在容器内执行指定命令,如果命令退出时返回码为0则认为诊断成功
+- TCPSocketAction:对指定端口上的容器的IP地址进行TCP检查,如果端口打开,则诊断被认为是成功的
+- HTTPGetAction:对指定的端口和路径上的容器的IP地址执行HTTPGet请求,如果响应的状态码大于等于200且小于400,则诊断被认为是成功的
+
+每次探测都将获得以下三种结果之一:
+ - 成功:容器通过了诊断
+- 失败:容器未通过诊断
+- 未知:诊断失败,因此不会采取任何行动
+
+#### 3.2.2 配置探针
+
+[配置探针](https://kubernetes.io/zh/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
+
+##### 3.2.2.1 探针类型
+
+###### a. livenessProbe
+
+存活探针,检测容器是否正在运行,如果存活探测失败,则kubelet会杀死容器,并且容器将受其重启策略的影响.若容器不提供存活探针,则默认状态为Success,livenessProbe用于控制是否重启pod
+
+###### b. readinessProbe
+
+就绪探针.若就绪探测失效,端点控制器(endpoint)将从与Pod匹配的所有Service的端点中删除该Pod的IP地址,初始延迟(这段延迟用于当Pod创建完成后,给Pod时间让容器中的服务启动,延迟一段时间后再检查)之前的就绪状态默认为Failure(失败).若容器不提供就绪探针,则默认状态为Success.readinessProbe用于控制pod是否添加至service.
+
+endpoint资源:
+
+```
+root@k8s-master-1:~# kubectl get ep -A
+NAMESPACE              NAME                        ENDPOINTS                                                     AGE
+default                kubernetes                  192.168.0.181:6443,192.168.0.182:6443,192.168.0.183:6443      21d
+default                ng-deploy-80                10.200.109.97:80                                              21d
+erp                    erp-nginx-webapp-service    10.200.109.94:443,10.200.109.94:80                            18d
+erp                    erp-tomcat-webapp-service   10.200.109.100:8080                                           4d23h
+erp                    zookeeper1                  10.200.109.101:2181,10.200.109.101:2888,10.200.109.101:3888   19d
+erp                    zookeeper2                  10.200.109.98:2181,10.200.109.98:2888,10.200.109.98:3888      19d
+erp                    zookeeper3                  10.200.109.95:2181,10.200.109.95:2888,10.200.109.95:3888      19d
+kube-system            kube-dns                    10.200.109.102:53,10.200.109.102:53,10.200.109.102:9153       21d
+kubernetes-dashboard   dashboard-metrics-scraper   10.200.109.96:8000                                            21d
+kubernetes-dashboard   kubernetes-dashboard        10.200.109.99:8443                                            21d
+```
+
+livenessProbe用于控制容器是否重启;readinessProbe用于控制容器地址是否加入service.
+
+##### 3.2.2.2 探针配置
+
+[探针配置](https://kubernetes.io/zh/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
+
+探针有很多配置字段,可以使用这些字段精确的控制存活和就绪检测的行为:
+
+```yaml
+# 初始化延迟时间.设置kubelet在执行第一次探测前应该等待多少秒,默认是0秒,最小值是0initialDelaySeconds: 120
+
+# 探测周期间隔时间.指定了kubelet应该每多少秒执行一次存活探测,默认是10秒.最小值是1
+periodSeconds: 60 
+
+# 单次探测超时时间.探测的超时后等待多少秒,默认值是1秒,最小值是1
+timeoutSeconds: 5 
+
+# 从失败转为成功的重试次数/探测器在失败后,被视为成功的最小连续成功数,默认值是1,存活探测的这个值必须是1(配置了别的值也不生效),最小值是1
+successThreshold: 1 
+
+# 从成功转为失败的重试次数.当Pod启动了并且探测到失败,Kubernetes的重试次数,存活探测情况下的放弃就意味着重新启动容器,就绪探测情况下的放弃Pod会被打上未就绪的标签,默认值是3,最小值是1
+failureThreshold: 3 
+```
+
+HTTP探针可以在httpGet上配置额外的字段:
+
+```yaml
+# 连接使用的主机名,默认是Pod的IP,也可以在HTTP头中设置 "Host"来代替host:
+
+# 用于设置连接主机的方式(HTTP还是HTTPS),默认是HTTP
+scheme: http
+
+# 访问HTTP服务的路径
+path: /monitor/index.html
+
+# 请求中自定义的HTTP头,HTTP头字段允许重复
+httpHeaders:
+
+# 访问容器的端口号或者端口名,如果数字必须在1-65535之间
+port: 80
+```
+
+##### 3.2.2.3 HTTP探针示例
+
+###### a. 存活探针示例
+
+- step1. 创建pod并配置存活探针
+
+```
+root@k8s-master-1:~# mkdir probe-yaml
+root@k8s-master-1:~# cd probe-yaml/
+root@k8s-master-1:~/probe-yaml# mkdir nginx
+root@k8s-master-1:~/probe-yaml# cd nginx/
+root@k8s-master-1:~/probe-yaml/nginx# vim nginx-deployment.yaml
+root@k8s-master-1:~/probe-yaml/nginx# cat nginx-deployment.yaml
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-probe-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-porbe-deploy-80
+  template:
+    metadata:
+      labels:
+        app: nginx-porbe-deploy-80
+    spec:
+      containers:
+        - name: ng-probe-deploy-80
+          image: harbor.k8s.com/erp/nginx:1.16.1
+          ports:
+            - containerPort: 80
+          livenessProbe:
+            httpGet:
+              path: /index.html
+              port: 80
+            # 初始延迟5秒
+            initialDelaySeconds: 5
+            # 检测频率 3s/次
+            periodSeconds: 3
+            # 超时时间 5s
+            timeoutSeconds: 5
+            # 从失败转为成功的连续成功次数(写别的值也不生效)
+            successThreshold: 1
+            # 从成功转为失败的连续失败次数
+            failureThreshold: 3
+```
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# kubectl apply -f nginx-deployment.yaml 
+deployment.apps/nginx-probe-deployment created
+root@k8s-master-1:~/probe-yaml/nginx# kubectl get pod
+NAME                                      READY   STATUS    RESTARTS   AGE
+nginx-deployment-645fc9c5bf-tlnjf         1/1     Running   0          125m
+nginx-probe-deployment-5699fd8bf6-25lml   1/1     Running   0          7s
+```
+
+- step2. 配置service
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# vim nginx-service.yaml 
+root@k8s-master-1:~/probe-yaml/nginx# cat nginx-service.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-probe-service
+spec:
+  ports:
+    - name: http
+      port: 81
+      targetPort: 80
+      nodePort: 40012
+      protocol: TCP
+  type: NodePort
+  selector:
+    app: nginx-porbe-deploy-80
+```
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# kubectl apply -f nginx-service.yaml 
+service/nginx-probe-service created
+root@k8s-master-1:~/probe-yaml/nginx# kubectl get svc
+NAME                  TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+kubernetes            ClusterIP   10.100.0.1     <none>        443/TCP        21d
+ng-deploy-80          NodePort    10.100.32.30   <none>        81:30019/TCP   21d
+nginx-probe-service   NodePort    10.100.36.21   <none>        81:40012/TCP   5s
+```
+
+- step3. 测试
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# curl 172.16.1.191:40012
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+```
+
+- step4. 修改存活探针的HTTP探测器部分,使其探测一个不存在的页面,并查看pod的重启情况
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# vim nginx-deployment.yaml 
+root@k8s-master-1:~/probe-yaml/nginx# cat nginx-deployment.yaml
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-probe-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-porbe-deploy-80
+  template:
+    metadata:
+      labels:
+        app: nginx-porbe-deploy-80
+    spec:
+      containers:
+        - name: ng-probe-deploy-80
+          image: harbor.k8s.com/erp/nginx:1.16.1
+          ports:
+            - containerPort: 80
+          livenessProbe:
+            httpGet:
+              path: /index1.html
+              port: 80
+            # 初始延迟5秒
+            initialDelaySeconds: 5
+            # 检测频率 3s/次
+            periodSeconds: 3
+            # 超时时间 5s
+            timeoutSeconds: 5
+            # 从失败转为成功的连续成功次数(写别的值也不生效)
+            successThreshold: 1
+            # 从成功转为失败的连续失败次数
+            failureThreshold: 3
+```
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# kubectl apply -f nginx-deployment.yaml 
+deployment.apps/nginx-probe-deployment configured
+```
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# kubectl get pod
+NAME                                     READY   STATUS    RESTARTS   AGE
+nginx-deployment-645fc9c5bf-tlnjf        1/1     Running   0          144m
+nginx-probe-deployment-56d4ddcd5-z2qxh   1/1     Running   1          21s
+root@k8s-master-1:~/probe-yaml/nginx# kubectl get pod
+NAME                                     READY   STATUS    RESTARTS   AGE
+nginx-deployment-645fc9c5bf-tlnjf        1/1     Running   0          144m
+nginx-probe-deployment-56d4ddcd5-z2qxh   1/1     Running   2          30s
+root@k8s-master-1:~/probe-yaml/nginx# kubectl get pod
+NAME                                     READY   STATUS    RESTARTS   AGE
+nginx-deployment-645fc9c5bf-tlnjf        1/1     Running   0          144m
+nginx-probe-deployment-56d4ddcd5-z2qxh   1/1     Running   3          48s
+```
+
+可以看到,pod在不断的被重启,直到超过3次,进入CrashLoopBackOff状态
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# kubectl get pod
+NAME                                     READY   STATUS             RESTARTS   AGE
+nginx-deployment-645fc9c5bf-tlnjf        1/1     Running            0          157m
+nginx-probe-deployment-56d4ddcd5-z2qxh   0/1     CrashLoopBackOff   9          13m
+```
+
+由于定义的是存活探针,因此即使检查失败,service中依然存在该pod的地址:
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# kubectl get svc
+NAME                  TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+kubernetes            ClusterIP   10.100.0.1     <none>        443/TCP        21d
+ng-deploy-80          NodePort    10.100.32.30   <none>        81:30019/TCP   21d
+nginx-probe-service   NodePort    10.100.36.21   <none>        81:40012/TCP   33m
+```
+
+###### b. 就绪探针示例
+
+- step1. 创建pod并配置就绪探针
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# cp nginx-deployment.yaml nginx-readiness-deployment.yaml
+root@k8s-master-1:~/probe-yaml/nginx# vim nginx-readiness-deployment.yaml 
+root@k8s-master-1:~/probe-yaml/nginx# cat nginx-readiness-deployment.yaml
+```
+
+```yaml 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-probe-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-porbe-deploy-80
+  template:
+    metadata:
+      labels:
+        app: nginx-porbe-deploy-80
+    spec:
+      containers:
+        - name: ng-probe-deploy-80
+          image: harbor.k8s.com/erp/nginx:1.16.1
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /index.html
+              port: 80
+            # 初始延迟5秒
+            initialDelaySeconds: 5
+            # 检测频率 3s/次
+            periodSeconds: 3
+            # 超时时间 5s
+            timeoutSeconds: 5
+            # 从失败转为成功的连续成功次数(写别的值也不生效)
+            successThreshold: 1
+            # 从成功转为失败的连续失败次数
+            failureThreshold: 3
+```
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# kubectl delete -f nginx-deployment.yaml 
+deployment.apps "nginx-probe-deployment" deleted
+root@k8s-master-1:~/probe-yaml/nginx# kubectl apply -f nginx-readiness-deployment.yaml 
+deployment.apps/nginx-probe-deployment created
+root@k8s-master-1:~/probe-yaml/nginx# kubectl get pod
+NAME                                      READY   STATUS    RESTARTS   AGE
+nginx-deployment-645fc9c5bf-tlnjf         1/1     Running   0          167m
+nginx-probe-deployment-54fdd4899d-975cq   1/1     Running   0          17s
+```
+
+- step2. 创建service
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# vim nginx-service.yaml 
+root@k8s-master-1:~/probe-yaml/nginx# cat nginx-service.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-probe-service
+spec:
+  ports:
+    - name: http
+      port: 81
+      targetPort: 80
+      nodePort: 40012
+      protocol: TCP
+  type: NodePort
+  selector:
+    app: nginx-porbe-deploy-80
+```
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# kubectl delete -f nginx-service.yaml 
+service "nginx-probe-service" deleted
+root@k8s-master-1:~/probe-yaml/nginx# kubectl apply -f nginx-service.yaml 
+service/nginx-probe-service created
+root@k8s-master-1:~/probe-yaml/nginx# kubectl get svc
+NAME                  TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+kubernetes            ClusterIP   10.100.0.1      <none>        443/TCP        21d
+ng-deploy-80          NodePort    10.100.32.30    <none>        81:30019/TCP   21d
+nginx-probe-service   NodePort    10.100.81.192   <none>        81:40012/TCP   7s
+```
+
+- step3. 查看endpoint信息
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# kubectl get ep
+NAME                  ENDPOINTS                                                  AGE
+kubernetes            192.168.0.181:6443,192.168.0.182:6443,192.168.0.183:6443   21d
+ng-deploy-80          10.200.109.97:80                                           21d
+nginx-probe-service   10.200.76.156:80                                           3m8s
+```
+
+可以看到,pod通过了就绪探针的检查,endpoint中有pod的IP地址.
+
+- step4. 修改错误的就绪探针信息并重新创建pod和service
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# vim nginx-readiness-deployment.yaml 
+root@k8s-master-1:~/probe-yaml/nginx# cat nginx-readiness-deployment.yaml
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-probe-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-porbe-deploy-80
+  template:
+    metadata:
+      labels:
+        app: nginx-porbe-deploy-80
+    spec:
+      containers:
+        - name: ng-probe-deploy-80
+          image: harbor.k8s.com/erp/nginx:1.16.1
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /index1.html
+              port: 80
+            # 初始延迟5秒
+            initialDelaySeconds: 5
+            # 检测频率 3s/次
+            periodSeconds: 3
+            # 超时时间 5s
+            timeoutSeconds: 5
+            # 从失败转为成功的连续成功次数(写别的值也不生效)
+            successThreshold: 1
+            # 从成功转为失败的连续失败次数
+            failureThreshold: 3
+```
+
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# kubectl apply -f nginx-readiness-deployment.yaml 
+deployment.apps/nginx-probe-deployment created
+root@k8s-master-1:~/probe-yaml/nginx# kubectl apply -f nginx-service.yaml 
+service/nginx-probe-service created
+```
+
+- step5. 查看endpoint信息和service信息
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# kubectl get ep
+NAME                  ENDPOINTS                                                  AGE
+kubernetes            192.168.0.181:6443,192.168.0.182:6443,192.168.0.183:6443   21d
+ng-deploy-80          10.200.109.97:80                                           21d
+nginx-probe-service                                                              4s
+```
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# kubectl get svc
+NAME                  TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+kubernetes            ClusterIP   10.100.0.1      <none>        443/TCP        21d
+ng-deploy-80          NodePort    10.100.32.30    <none>        81:30019/TCP   21d
+nginx-probe-service   NodePort    10.100.29.127   <none>        81:40012/TCP   30s
+```
+
+可以看到,endpoint中已经没有该pod的IP地址了.实际上该Pod已经启动了,只是没有进入READY状态:
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# kubectl get pod
+NAME                                      READY   STATUS    RESTARTS   AGE
+nginx-deployment-645fc9c5bf-tlnjf         1/1     Running   0          178m
+nginx-probe-deployment-84ffb9b4d5-pzktl   0/1     Running   0          86s
+```
+
+##### 3.2.2.4 TCP探针示例
+
+- step1. 创建Pod并配置TCP探针
+
+```
+root@k8s-master-1:~/probe-yaml/nginx# cd ..
+root@k8s-master-1:~/probe-yaml#  mkdir tcp-probe
+root@k8s-master-1:~/probe-yaml# cd tcp-probe/
+root@k8s-master-1:~/probe-yaml/tcp-probe# vim tcp-deployment.yaml
+root@k8s-master-1:~/probe-yaml/tcp-probe# cat tcp-deployment.yaml
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-tcp-probe-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-tcp-probe-80
+  template:
+    metadata:
+      labels:
+        app: nginx-tcp-probe-80
+    spec:
+      containers:
+        - name: nginx-tcp-probe-80
+          image: harbor.k8s.com/erp/nginx:1.16.1
+          ports: 
+            - containerPort: 80
+          # 存活探针
+          livenessProbe:
+            tcpSocket:
+              port: 80
+            # 初始延迟5秒
+            initialDelaySeconds: 5
+            # 检测频率 3s/次
+            periodSeconds: 3
+            # 超时时间 5s
+            timeoutSeconds: 5
+            # 从失败转为成功的连续成功次数(写别的值也不生效)
+            successThreshold: 1
+            # 从成功转为失败的连续失败次数
+            failureThreshold: 3
+
+          # 就绪探针
+          readinessProbe:
+            tcpSocket:
+              port: 80
+              # 初始延迟5秒
+            initialDelaySeconds: 5
+            # 检测频率 3s/次
+            periodSeconds: 3
+            # 超时时间 5s
+            timeoutSeconds: 5
+            # 从失败转为成功的连续成功次数(写别的值也不生效)
+            successThreshold: 1
+            # 从成功转为失败的连续失败次数
+            failureThreshold: 3
+```
+
+```
+root@k8s-master-1:~/probe-yaml/tcp-probe# kubectl apply -f tcp-deployment.yaml 
+deployment.apps/nginx-tcp-probe-deployment created
+```
+
+```
+root@k8s-master-1:~/probe-yaml/tcp-probe# kubectl get pod
+NAME                                          READY   STATUS    RESTARTS   AGE
+nginx-deployment-645fc9c5bf-tlnjf             1/1     Running   0          3h24m
+nginx-probe-deployment-84ffb9b4d5-pzktl       0/1     Running   0          27m
+nginx-tcp-probe-deployment-74c65b669b-kjl8n   1/1     Running   0          2m11s
+```
+
+可以看到,Pod处于READY状态.
+
+- step2. 创建service
+
+```
+root@k8s-master-1:~/probe-yaml/tcp-probe# vim tcp-service.yaml 
+root@k8s-master-1:~/probe-yaml/tcp-probe# cat tcp-service.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-tcp-probe-service
+spec:
+  ports:
+  - name: http
+    port: 81
+    targetPort: 80
+    nodePort: 40012
+    protocol: TCP
+  type: NodePort
+  selector:
+    app: nginx-tcp-probe-80
+```
+
+```
+root@k8s-master-1:~/probe-yaml/tcp-probe# kubectl apply -f tcp-service.yaml 
+service/nginx-tcp-probe-service created
+root@k8s-master-1:~/probe-yaml/tcp-probe# kubectl get svc
+NAME                      TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+kubernetes                ClusterIP   10.100.0.1     <none>        443/TCP        21d
+ng-deploy-80              NodePort    10.100.32.30   <none>        81:30019/TCP   21d
+nginx-tcp-probe-service   NodePort    10.100.102.2   <none>        81:40012/TCP   4s
+```
+
+- step3. 删除正确的pod和service.修改探针的信息,使探针探测错误的端口
+
+```
+root@k8s-master-1:~/probe-yaml/tcp-probe# kubectl delete -f .
+deployment.apps "nginx-tcp-probe-deployment" deleted
+service "nginx-tcp-probe-service" deleted
+root@k8s-master-1:~/probe-yaml/tcp-probe# vim tcp-deployment.yaml 
+root@k8s-master-1:~/probe-yaml/tcp-probe# cat tcp-deployment.yaml
+apiVersion: apps/v1
+```
+
+```yaml
+kind: Deployment
+metadata:
+  name: nginx-tcp-probe-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-tcp-probe-80
+  template:
+    metadata:
+      labels:
+        app: nginx-tcp-probe-80
+    spec:
+      containers:
+        - name: nginx-tcp-probe-80
+          image: harbor.k8s.com/erp/nginx:1.16.1
+          ports: 
+            - containerPort: 80
+          # 存活探针
+          livenessProbe:
+            tcpSocket:
+              port: 81
+            # 初始延迟5秒
+            initialDelaySeconds: 5
+            # 检测频率 3s/次
+            periodSeconds: 3
+            # 超时时间 5s
+            timeoutSeconds: 5
+            # 从失败转为成功的连续成功次数(写别的值也不生效)
+            successThreshold: 1
+            # 从成功转为失败的连续失败次数
+            failureThreshold: 3
+
+          # 就绪探针
+          readinessProbe:
+            tcpSocket:
+              port: 81
+              # 初始延迟5秒
+            initialDelaySeconds: 5
+            # 检测频率 3s/次
+            periodSeconds: 3
+            # 超时时间 5s
+            timeoutSeconds: 5
+            # 从失败转为成功的连续成功次数(写别的值也不生效)
+            successThreshold: 1
+            # 从成功转为失败的连续失败次数
+            failureThreshold: 3
+```
+
+```
+root@k8s-master-1:~/probe-yaml/tcp-probe# kubectl apply -f .
+deployment.apps/nginx-tcp-probe-deployment created
+service/nginx-tcp-probe-service created
+```
+
+- step4. 查看pod重启情况和endpoint信息
+
+```
+root@k8s-master-1:~/probe-yaml/tcp-probe# kubectl get pod
+NAME                                          READY   STATUS    RESTARTS   AGE
+nginx-deployment-645fc9c5bf-tlnjf             1/1     Running   0          3h30m
+nginx-tcp-probe-deployment-7d64c77cbb-km8bm   0/1     Running   2          39s
+root@k8s-master-1:~/probe-yaml/tcp-probe# kubectl get pod
+NAME                                          READY   STATUS             RESTARTS   AGE
+nginx-deployment-645fc9c5bf-tlnjf             1/1     Running            0          3h31m
+nginx-tcp-probe-deployment-7d64c77cbb-km8bm   0/1     CrashLoopBackOff   3          59s
+```
+
+可以看到,pod不断重启,直到进入CrashLoopBackOff状态
+
+```
+root@k8s-master-1:~/probe-yaml/tcp-probe# kubectl get ep
+NAME                      ENDPOINTS                                                  AGE
+kubernetes                192.168.0.181:6443,192.168.0.182:6443,192.168.0.183:6443   21d
+ng-deploy-80              10.200.109.97:80                                           21d
+nginx-tcp-probe-service                                                              44s
+```
+
+可以看到,endpoint中没有该pod的IP地址.
+
+##### 3.2.2.5 ExecAction探针
+
+- step1. 删除之前pod和service.创建pod并配置EXEC探针
+
+```
+root@k8s-master-1:~/probe-yaml/tcp-probe# kubectl delete -f .
+deployment.apps "nginx-tcp-probe-deployment" deleted
+service "nginx-tcp-probe-service" deleted
+root@k8s-master-1:~/probe-yaml/tcp-probe# cd ..
+root@k8s-master-1:~/probe-yaml# mkdir exec-probe
+root@k8s-master-1:~/probe-yaml# cd exec-probe/
+root@k8s-master-1:~/probe-yaml/exec-probe# vim exec-deployment.yaml
+root@k8s-master-1:~/probe-yaml/exec-probe# cat exec-deployment.yaml
+```
+
+```yaml 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-exec-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-exec-deploy
+  template:
+    metadata:
+      labels:
+        app: redis-exec-deploy
+    spec:
+      containers:
+      - name: redis-exec-deploy
+        image: redis
+        ports:
+        - containerPort: 6379
+        readinessProbe:
+          exec:
+            command:
+            - /usr/local/bin/redis-cli
+            - quit
+          initialDelaySeconds: 5
+          periodSeconds: 3
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+
+        livenessProbe:
+          exec:
+            command:
+            - /usr/local/bin/redis-cli
+            - quit
+          initialDelaySeconds: 5
+          periodSeconds: 3
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+```
+
+```
+root@k8s-master-1:~/probe-yaml/exec-probe# kubectl apply -f exec-deployment.yaml 
+deployment.apps/redis-exec-deployment created
+```
+
+```
+root@k8s-master-1:~/probe-yaml/exec-probe# vim exec-service.yaml 
+root@k8s-master-1:~/probe-yaml/exec-probe# cat exec-service.yaml
+root@k8s-master-1:~/probe-yaml/exec-probe# kubectl get pod
+NAME                                     READY   STATUS    RESTARTS   AGE
+nginx-deployment-645fc9c5bf-tlnjf        1/1     Running   0          3h40m
+redis-exec-deployment-79c8fbb5b5-v2957   1/1     Running   0          86s 
+```
+
+可以看到,pod状态为READY
+
+- step2. 创建service
+
+```
+root@k8s-master-1:~/probe-yaml/exec-probe# vim exec-service.yaml 
+root@k8s-master-1:~/probe-yaml/exec-probe# cat exec-service.yaml 
+```
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-exec-service
+spec:
+  ports:
+  - name: http
+    port: 6379
+    targetPort: 6379
+    nodePort: 40016
+    protocol: TCP
+  type: NodePort
+  selector:
+    app: redis-exec-deploy
+```
+
+```
+root@k8s-master-1:~/probe-yaml/exec-probe# kubectl apply -f exec-service.yaml 
+service/redis-exec-service created
+root@k8s-master-1:~/probe-yaml/exec-probe# kubectl get svc
+NAME                 TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+kubernetes           ClusterIP   10.100.0.1      <none>        443/TCP          21d
+ng-deploy-80         NodePort    10.100.32.30    <none>        81:30019/TCP     21d
+redis-exec-service   NodePort    10.100.25.147   <none>        6379:40016/TCP   5s
+```
+
+- step3. 删除正确的pod和service.修改探针的信息,使探针执行错误的命令
+
+```
+root@k8s-master-1:~/probe-yaml/exec-probe# kubectl delete -f .
+deployment.apps "redis-exec-deployment" deleted
+service "redis-exec-service" deleted
+root@k8s-master-1:~/probe-yaml/exec-probe# vim exec-deployment.yaml 
+root@k8s-master-1:~/probe-yaml/exec-probe# cat exec-deployment.yaml
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-exec-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-exec-deploy
+  template:
+    metadata:
+      labels:
+        app: redis-exec-deploy
+    spec:
+      containers:
+      - name: redis-exec-deploy
+        image: redis
+        ports:
+        - containerPort: 6379
+        readinessProbe:
+          exec:
+            command:
+            - /usr/local/bin/redis-cli1
+            - quit
+          initialDelaySeconds: 5
+          periodSeconds: 3
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+
+        livenessProbe:
+          exec:
+            command:
+            - /usr/local/bin/redis-cli1
+            - quit
+          initialDelaySeconds: 5
+          periodSeconds: 3
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+```
+
+```
+root@k8s-master-1:~/probe-yaml/exec-probe# kubectl apply -f .
+deployment.apps/redis-exec-deployment created
+service/redis-exec-service created
+```
+
+- step4. 查看pod状态和endpoint信息
+
+```
+root@k8s-master-1:~/probe-yaml/exec-probe# kubectl get pod
+NAME                                     READY   STATUS    RESTARTS   AGE
+nginx-deployment-645fc9c5bf-tlnjf        1/1     Running   0          3h48m
+redis-exec-deployment-6ddf885b7c-xqxk5   0/1     Running   0          71s
+root@k8s-master-1:~/probe-yaml/exec-probe# kubectl get pod
+NAME                                     READY   STATUS    RESTARTS   AGE
+nginx-deployment-645fc9c5bf-tlnjf        1/1     Running   0          3h49m
+redis-exec-deployment-6ddf885b7c-xqxk5   0/1     Running   2          2m9s
+root@k8s-master-1:~/probe-yaml/exec-probe# kubectl get pod
+NAME                                     READY   STATUS    RESTARTS   AGE
+nginx-deployment-645fc9c5bf-tlnjf        1/1     Running   0          3h49m
+redis-exec-deployment-6ddf885b7c-xqxk5   0/1     Running   3          2m42s
+root@k8s-master-1:~/probe-yaml/exec-probe# kubectl get pod
+NAME                                     READY   STATUS             RESTARTS   AGE
+nginx-deployment-645fc9c5bf-tlnjf        1/1     Running            0          3h50m
+redis-exec-deployment-6ddf885b7c-xqxk5   0/1     CrashLoopBackOff   4          3m38s
+```
+
+可以看到,Pod不断重启,直到设定的失败次数后,进入CrashLoopBackOff状态
+
+```
+root@k8s-master-1:~/probe-yaml/exec-probe# kubectl get ep
+NAME                 ENDPOINTS                                                  AGE
+kubernetes           192.168.0.181:6443,192.168.0.182:6443,192.168.0.183:6443   21d
+ng-deploy-80         10.200.109.97:80                                           21d
+redis-exec-service                                                              2m32s
+```
+
+可以看到,endpoint中没有该Pod的IP地址信息
+
+#### 3.2.4 Pod重启策略
+
+k8s在Pod出现异常的时候会自动将Pod重启以恢复Pod中的服务
+
+重启策略:
+
+- Always:当容器异常时,k8s自动重启该容器.通常用于ReplicationController/Replicaset/Deployment
+- OnFailure:当容器失败时(容器停止运行且退出码不为0),k8s自动重启该容器
+- Never:不论容器运行状态如何都不会重启该容器.通常用于Job或CronJob
+
+示例:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-exec-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-exec-deploy
+  template:
+    metadata:
+      labels:
+        app: redis-exec-deploy
+    spec:
+      containers:
+      - name: redis-exec-deploy
+        image: redis
+        ports:
+        - containerPort: 6379
+        readinessProbe:
+          exec:
+            command:
+            - /usr/local/bin/redis-cli
+            - quit
+          initialDelaySeconds: 5
+          periodSeconds: 3
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+
+        livenessProbe:
+          exec:
+            command:
+            - /usr/local/bin/redis-cli
+            - quit
+          initialDelaySeconds: 5
+          periodSeconds: 3
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+      restartPolicy: Always
+```
+
+#### 3.2.5 镜像拉取策略
+
+[镜像拉取策略](https://kubernetes.io/zh/docs/concepts/configuration/overview/)
+
+ - `imagePullPolicy:IfNotPresent`:node节点没有此镜像就去指定的镜像仓库拉取,node有就使用node本地镜像
+- `imagePullPolicy:Always`:每次重建pod都会重新拉取镜像
+- `imagePullPolicy:Never`:从不到镜像中心拉取镜像,只使用本地镜像
+
+
+
+
+
+
+
+
+
+
+
+

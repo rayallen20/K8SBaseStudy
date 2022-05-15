@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-tcp-probe-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-tcp-probe-80
+  template:
+    metadata:
+      labels:
+        app: nginx-tcp-probe-80
+    spec:
+      containers:
+        - name: nginx-tcp-probe-80
+          image: harbor.k8s.com/erp/nginx:1.16.1
+          ports: 
+            - containerPort: 80
+          # 存活探针
+          livenessProbe:
+            tcpSocket:
+              port: 80
+            # 初始延迟5秒
+            initialDelaySeconds: 5
+            # 检测频率 3s/次
+            periodSeconds: 3
+            # 超时时间 5s
+            timeoutSeconds: 5
+            # 从失败转为成功的连续成功次数(写别的值也不生效)
+            successThreshold: 1
+            # 从成功转为失败的连续失败次数
+            failureThreshold: 3
+
+          # 就绪探针
+          readinessProbe:
+            tcpSocket:
+              port: 80
+              # 初始延迟5秒
+            initialDelaySeconds: 5
+            # 检测频率 3s/次
+            periodSeconds: 3
+            # 超时时间 5s
+            timeoutSeconds: 5
+            # 从失败转为成功的连续成功次数(写别的值也不生效)
+            successThreshold: 1
+            # 从成功转为失败的连续失败次数
+            failureThreshold: 3

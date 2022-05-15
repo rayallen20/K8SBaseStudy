@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-exec-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-exec-deploy
+  template:
+    metadata:
+      labels:
+        app: redis-exec-deploy
+    spec:
+      containers:
+      - name: redis-exec-deploy
+        image: redis
+        ports:
+        - containerPort: 6379
+        readinessProbe:
+          exec:
+            command:
+            - /usr/local/bin/redis-cli
+            - quit
+          initialDelaySeconds: 5
+          periodSeconds: 3
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+
+        livenessProbe:
+          exec:
+            command:
+            - /usr/local/bin/redis-cli
+            - quit
+          initialDelaySeconds: 5
+          periodSeconds: 3
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3

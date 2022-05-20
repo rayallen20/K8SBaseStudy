@@ -1,0 +1,50 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: wordpress-app
+  name: wordpress-app-deployment
+  namespace: erp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wordpress-app
+  template:
+    metadata:
+      labels:
+        app: wordpress-app
+    spec:
+      containers:
+      - name: wordpress-app-nginx
+        image: harbor.k8s.com/erp/wordpress-nginx:v1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          protocol: TCP
+          name: http
+        - containerPort: 443
+          protocol: TCP
+          name: https
+        volumeMounts:
+        - name: wordpress
+          mountPath: /home/nginx/wordpress
+          readOnly: false
+
+      - name: wordpress-app-php
+        image: harbor.k8s.com/erp/wordpress-php-5.6:v1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9000
+          protocol: TCP
+          name: http
+        volumeMounts:
+        - name: wordpress
+          mountPath: /home/nginx/wordpress
+          readOnly: false
+
+      volumes:
+      - name: wordpress
+        nfs:
+          server: 172.16.1.189
+          path: /data/k8sdata/erp/wordpress 

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-conf
+  namespace: erp
+  labels:
+    app: mysql-conf
+data:
+  master.cnf: |
+    # 仅master节点会使用该配置
+    [mysqld]
+    log-bin
+    log_bin_trust_function_creators=1
+    lower_case_table_names=1
+  slave.cnf: |
+    # 仅slave节点会使用该配置
+    [mysqld]
+    super-read-only
+    log_bin_trust_function_creators=1

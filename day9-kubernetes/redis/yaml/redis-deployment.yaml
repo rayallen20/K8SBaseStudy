@@ -1,0 +1,28 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: erp-redis-deployment
+  name: redis-deployment
+  namespace: erp
+spec:
+  replicas: 1 
+  selector:
+    matchLabels:
+      app: erp-redis
+  template:
+    metadata:
+      labels:
+        app: erp-redis
+    spec:
+      containers:
+        - name: redis-container
+          image: harbor.k8s.com/erp/redis:v4.0.14
+          imagePullPolicy: Always
+          volumeMounts:
+          - mountPath: "/data/redis-data/"
+            name: redis-datadir
+      volumes:
+        - name: redis-datadir
+          persistentVolumeClaim:
+            claimName: redis-pvc-1

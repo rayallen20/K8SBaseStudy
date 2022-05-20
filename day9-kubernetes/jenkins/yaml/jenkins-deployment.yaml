@@ -1,0 +1,37 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: erp-jenkins
+  name: erp-jenkins-deployment
+  namespace: erp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: erp-jenkins
+  template:
+    metadata:
+      labels:
+        app: erp-jenkins
+    spec:
+      containers:
+      - name: erp-jenkins-container
+        image: harbor.k8s.com/erp/jenkins:v2.190.1 
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+          name: http
+        volumeMounts:
+        - mountPath: "/apps/jenkins/jenkins-data/"
+          name: jenkins-datadir
+        - mountPath: "/root/.jenkins"
+          name: jenkins-root-datadir
+      volumes:
+        - name: jenkins-datadir
+          persistentVolumeClaim:
+            claimName: jenkins-datadir-pvc
+        - name: jenkins-root-datadir
+          persistentVolumeClaim:
+            claimName: jenkins-root-data-pvc

@@ -1,0 +1,22 @@
+kind: Service
+apiVersion: v1
+metadata:
+  labels:
+    app: wordpress-app
+  name: wordpress-app-spec
+  namespace: erp
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 80
+    nodePort: 30031
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 443
+    nodePort: 30033
+  selector:
+    app: wordpress-app

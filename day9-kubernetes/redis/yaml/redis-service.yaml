@@ -1,0 +1,23 @@
+kind: Service
+apiVersion: v1
+metadata:
+  labels:
+    app: erp-redis-service
+  name: redis-service
+  namespace: erp
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 6379 
+    targetPort: 6379
+    nodePort: 36379 
+  selector:
+    app: erp-redis
+  # session亲和性
+  # ClientIP表示同一个IP地址的请求转发给同一个后端服务器
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      # 会话保持时间
+      timeoutSeconds: 10800

@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dubbo-admin-deploy
+  namespace: erp
+  labels:
+    app: dubbo-admin-deploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dubbo-admin
+  template:
+    metadata:
+      labels:
+        app: dubbo-admin
+    spec:
+      containers:
+        - name: dubbo-admin
+          image: harbor.k8s.com/erp/dubboadmin:v1
+          imagePullPolicy: Always
+          command: [ "/bin/bash", "-ce", "java -Dadmin.registry.address=zookeeper://zookeeper1.erp.svc.mycluster.local:2181 -Dadmin.config-center=zookeeper://zookeeper1.erp.svc.mycluster.local:2181 -Dadmin.metadata-report.address=zookeeper://zookeeper1.erp.svc.mycluster.local:2181 -jar /app.jar"]
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 60 
+            periodSeconds: 20

@@ -1,0 +1,42 @@
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-url-tomcat-nginx
+  namespace: erp
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/app-root: /myapp/app/index.html
+spec:
+  rules:
+    - host: www.tomcatapp.com
+      http:
+        paths:
+          # /myapp的URL 转发到tomcatService
+          - path: /myapp
+            backend:
+              serviceName: erp-tomcat-webapp-service
+              servicePort: 80
+          # /webapp的URL 转发到nginxService
+          - path: /webapp
+            backend:
+              serviceName: erp-nginx-webapp-service
+              servicePort: 80
+
+    - host: mobile.tomcatapp.com
+      http:
+        paths:
+          # /myapp的URL 转发到tomcatService
+          - path: /myapp
+            backend:
+              serviceName: erp-tomcat-webapp-service
+              servicePort: 80
+          # /webapp的URL 转发到nginxService
+          - path: /webapp
+            backend:
+              serviceName: erp-nginx-webapp-service
+              servicePort: 80

@@ -4392,3 +4392,2781 @@ Query OK, 0 rows affected, 1 warning (0.00 sec)
 ![创建一篇博客并上传图片](./img/创建一篇博客并上传图片.png)
 
 本步骤是为了检测图片是否能够正确存储和访问,即验证读写权限是否正确
+
+## PART5. K8S运行dubbo + zookeeper微服务
+
+![微服务架构](./img/微服务架构.jpg)
+
+### 5.1 K8S运行Provider
+
+[demo下载地址](https://github.com/apache/dubbo/tree/dubbo-2.5.2/dubbo-demo)
+
+本示例中所有demo均使用dubbo官方示例.
+
+#### 5.1.1 构建Provider镜像
+
+- step1. 下载demo
+
+```
+root@ks8-harbor-2:/opt/k8s-data# mkdir dubbo-img
+root@ks8-harbor-2:/opt/k8s-data# cd dubbo-img/
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img# mkdir provider
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img# cd provider/
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/provider# ls
+dubbo-demo-provider-2.1.5-assembly.tar.gz
+```
+
+- step2. 解压缩并修改配置
+
+此处主要修改zookeeper的地址,修改为之前搭建的zookeeper的地址
+
+解压缩:
+
+```
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/provider# tar zxvf dubbo-demo-provider-2.1.5-assembly.tar.gz 
+dubbo-demo-provider-2.1.5/bin/
+dubbo-demo-provider-2.1.5/bin/server.sh
+dubbo-demo-provider-2.1.5/bin/restart.sh
+dubbo-demo-provider-2.1.5/bin/start.sh
+dubbo-demo-provider-2.1.5/bin/stop.sh
+dubbo-demo-provider-2.1.5/bin/dump.sh
+dubbo-demo-provider-2.1.5/bin/start.bat
+dubbo-demo-provider-2.1.5/conf/
+dubbo-demo-provider-2.1.5/conf/dubbo.properties
+dubbo-demo-provider-2.1.5/lib/dubbo-demo-2.1.5.jar
+dubbo-demo-provider-2.1.5/lib/dubbo-2.1.5.jar
+dubbo-demo-provider-2.1.5/lib/log4j-1.2.16.jar
+dubbo-demo-provider-2.1.5/lib/javassist-3.15.0-GA.jar
+dubbo-demo-provider-2.1.5/lib/spring-2.5.6.SEC03.jar
+dubbo-demo-provider-2.1.5/lib/commons-logging-1.1.1.jar
+dubbo-demo-provider-2.1.5/lib/netty-3.2.5.Final.jar
+dubbo-demo-provider-2.1.5/lib/jetty-6.1.26.jar
+dubbo-demo-provider-2.1.5/lib/jetty-util-6.1.26.jar
+dubbo-demo-provider-2.1.5/lib/servlet-api-2.5-20081211.jar
+dubbo-demo-provider-2.1.5/lib/zookeeper-3.3.3.jar
+dubbo-demo-provider-2.1.5/lib/jline-0.9.94.jar
+dubbo-demo-provider-2.1.5/lib/jedis-2.0.0.jar
+dubbo-demo-provider-2.1.5/lib/commons-pool-1.5.5.jar
+dubbo-demo-provider-2.1.5/lib/mina-core-1.1.7.jar
+dubbo-demo-provider-2.1.5/lib/slf4j-api-1.6.2.jar
+dubbo-demo-provider-2.1.5/lib/grizzly-core-2.1.4.jar
+dubbo-demo-provider-2.1.5/lib/grizzly-framework-2.1.4.jar
+dubbo-demo-provider-2.1.5/lib/gmbal-api-only-3.0.0-b023.jar
+dubbo-demo-provider-2.1.5/lib/management-api-3.0.0-b012.jar
+dubbo-demo-provider-2.1.5/lib/grizzly-portunif-2.1.4.jar
+dubbo-demo-provider-2.1.5/lib/grizzly-rcm-2.1.4.jar
+dubbo-demo-provider-2.1.5/lib/httpclient-4.1.2.jar
+dubbo-demo-provider-2.1.5/lib/httpcore-4.1.2.jar
+dubbo-demo-provider-2.1.5/lib/commons-codec-1.4.jar
+dubbo-demo-provider-2.1.5/lib/hessian-4.0.7.jar
+dubbo-demo-provider-2.1.5/lib/fastjson-1.1.8.jar
+dubbo-demo-provider-2.1.5/lib/validation-api-1.0.0.GA.jar
+dubbo-demo-provider-2.1.5/lib/hibernate-validator-4.2.0.Final.jar
+dubbo-demo-provider-2.1.5/lib/cache-api-0.4.jar
+dubbo-demo-provider-2.1.5/lib/dubbo-demo-provider-2.1.5.jar
+tar: A lone zero block at 22566
+```
+
+修改配置中关于zookeeper地址的部分:
+
+```
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/provider# cd dubbo-demo-provider-2.1.5/
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/provider/dubbo-demo-provider-2.1.5# cd conf/
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/provider/dubbo-demo-provider-2.1.5/conf# vim dubbo.properties 
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/provider/dubbo-demo-provider-2.1.5/conf# cat dubbo.properties
+##
+# Copyright 1999-2011 Alibaba Group.
+#  
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#  
+#      http://www.apache.org/licenses/LICENSE-2.0
+#  
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##
+dubbo.container=log4j,spring
+dubbo.application.name=demo-provider
+dubbo.application.owner=
+dubbo.registry.address=zookeeper://zookeeper1.erp.svc.mycluster.local:2181 | zookeeper://zookeeper2.erp.svc.mycluster.local:2181 | zookeeper://zookeeper3.erp.svc.mycluster.local:2181
+dubbo.monitor.protocol=registry
+dubbo.protocol.name=dubbo
+dubbo.protocol.port=20880
+dubbo.log4j.file=logs/dubbo-demo-provider.log
+dubbo.log4j.level=WARN
+```
+
+注意:这个zookeeper的地址最好提前在其他pod中试一下,看看能不能ping通.格式为:`serviceName.NamespaceName.svc.ClusterDNSDomain`
+
+- step3. 编写Dockerfile
+
+```
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/provider# vim Dockerfile
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/provider# cat Dockerfile
+```
+
+```Dockerfile
+FROM harbor.k8s.com/pub-images/jdk-base:v8.212 
+
+MAINTAINER Roach 40486453@qq.com
+
+RUN yum install file nc -y
+RUN mkdir -p /apps/dubbo/provider
+ADD dubbo-demo-provider-2.1.5/  /apps/dubbo/provider
+ADD run_java.sh /apps/dubbo/provider/bin 
+RUN chown nginx.nginx /apps -R
+RUN chmod a+x /apps/dubbo/provider/bin/*.sh
+
+CMD ["/apps/dubbo/provider/bin/run_java.sh"]
+```
+
+- step4. 编写启动脚本
+
+```
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/provider# vim run_java.sh
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/provider# cat run_java.sh
+```
+
+```sh
+#!/bin/bash
+su - nginx -c "/apps/dubbo/provider/bin/start.sh"
+tail -f /etc/hosts
+```
+
+- step5. 编写构建镜像脚本
+
+```
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/provider# vim build-command.sh 
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/provider# cat build-command.sh
+```
+
+```sh
+#!/bin/bash
+TAG=$1
+docker build -t harbor.k8s.com/erp/dubbo-demo-provider:${TAG} . --network=host
+sleep 3
+docker push harbor.k8s.com/erp/dubbo-demo-provider:${TAG}
+```
+
+- step6. 构建镜像
+
+```
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/provider# chmod a+x *.sh
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/provider# bash build-command.sh v1
+Sending build context to Docker daemon  21.84MB
+Step 1/9 : FROM harbor.k8s.com/pub-images/jdk-base:v8.212
+ ---> 7e075f036c9b
+Step 2/9 : MAINTAINER Roach 40486453@qq.com
+ ---> Using cache
+ ---> 16122955f193
+Step 3/9 : RUN yum install file nc -y
+ ---> Running in 266d4bea84ae
+Loaded plugins: fastestmirror, ovl
+Determining fastest mirrors
+ * base: ftp.sjtu.edu.cn
+ * extras: ftp.sjtu.edu.cn
+ * updates: ftp.sjtu.edu.cn
+Resolving Dependencies
+...
+Step 9/9 : CMD ["/apps/dubbo/provider/bin/run_java.sh"]
+ ---> Running in d334d3d38cc9
+Removing intermediate container d334d3d38cc9
+ ---> 20bf99dec6f2
+Successfully built 20bf99dec6f2
+Successfully tagged harbor.k8s.com/erp/dubbo-demo-provider:v1
+The push refers to repository [harbor.k8s.com/erp/dubbo-demo-provider]
+aab825532866: Pushed 
+f26b33639521: Pushed 
+d36802747dad: Pushed 
+0f4bc59302f3: Pushed 
+24767f059447: Pushed 
+7900453c45b4: Pushed 
+039fc3b13371: Mounted from erp/jenkins 
+4ac69e34cb8f: Mounted from erp/jenkins 
+2ee5b94985e2: Mounted from erp/jenkins 
+9af9a18fb5a7: Mounted from erp/wordpress-php-5.6 
+0c09dd020e8e: Mounted from erp/wordpress-php-5.6 
+fb82b029bea0: Mounted from erp/wordpress-php-5.6 
+v1: digest: sha256:a052a56abadd7913648b80a6c55d447a1f47821301c5528484592064c856b6cf size: 2840
+```
+
+由于此时zookeeper的地址写的是K8S中Service的地址,所以无法测试.
+
+#### 5.1.2 创建Provider Pod
+
+- step1. 创建Pod
+
+```
+root@k8s-master-1:~/k8s-data/wordpress-yaml# cd ..
+root@k8s-master-1:~/k8s-data# mkdir dubbo-yaml
+root@k8s-master-1:~/k8s-data# cd dubbo-yaml/
+root@k8s-master-1:~/k8s-data/dubbo-yaml# mkdir provider
+root@k8s-master-1:~/k8s-data/dubbo-yaml# cd provider/
+root@k8s-master-1:~/k8s-data/dubbo-yaml/provider# vim provider-deployment.yaml
+root@k8s-master-1:~/k8s-data/dubbo-yaml/provider# cat provider-deployment.yaml
+```
+
+```yaml
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: erp-provider
+  name: erp-provider-deployment
+  namespace: erp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: erp-provider
+  template:
+    metadata:
+      labels:
+        app: erp-provider
+    spec:
+      containers:
+      - name: erp-provider-container
+        image: harbor.k8s.com/erp/dubbo-demo-provider:v1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 20880
+          protocol: TCP
+          name: http
+```
+
+```
+root@k8s-master-1:~/k8s-data/dubbo-yaml/provider# kubectl apply -f provider-deployment.yaml 
+deployment.apps/erp-provider-deployment created
+root@k8s-master-1:~/k8s-data/dubbo-yaml/provider# kubectl get pod -n erp
+NAME                                            READY   STATUS    RESTARTS   AGE
+erp-jenkins-deployment-696696cb65-b79sr         1/1     Running   0          11h
+erp-nginx-webapp-deployment-65fb86d9f6-8mhhb    1/1     Running   6          13h
+erp-provider-deployment-747df899c4-4z7gb        1/1     Running   0          11s
+erp-tomcat-webapp-deployment-84bbf6b865-fdq8z   1/1     Running   1          13h
+mysql-0                                         2/2     Running   2          13h
+mysql-1                                         2/2     Running   2          13h
+mysql-2                                         2/2     Running   2          13h
+redis-deployment-6d85975b47-9nns2               1/1     Running   1          13h
+wordpress-app-deployment-7fcb55bd59-l745v       2/2     Running   0          6h6m
+zookeeper1-7ff6fbfbf-pstf9                      1/1     Running   1          13h
+zookeeper2-94cfd4596-z56n9                      1/1     Running   1          13h
+zookeeper3-7f55657779-62hvf                     1/1     Running   1          13h
+```
+
+#### 5.1.3 创建Provider Service
+
+```
+root@k8s-master-1:~/k8s-data/dubbo-yaml/provider# vim provider-service.yaml
+root@k8s-master-1:~/k8s-data/dubbo-yaml/provider# cat provider-service.yaml
+```
+
+```yaml
+kind: Service
+apiVersion: v1
+metadata:
+  labels:
+    app: erp-provider
+  name: erp-provider-service
+  namespace: erp
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 20880
+  selector:
+    app: erp-provider
+```    
+    
+```
+root@k8s-master-1:~/k8s-data/dubbo-yaml/provider# kubectl apply -f provider-service.yaml 
+service/erp-provider-service created
+root@k8s-master-1:~/k8s-data/dubbo-yaml/provider# kubectl get svc -n erp
+NAME                        TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                                        AGE
+erp-jenkins-service         NodePort    10.100.192.166   <none>        80:38080/TCP                                   11h
+erp-nginx-webapp-service    NodePort    10.100.9.36      <none>        80:40002/TCP,443:40443/TCP                     24d
+erp-provider-service        NodePort    10.100.0.236     <none>        80:45130/TCP                                   8s
+erp-tomcat-webapp-service   NodePort    10.100.139.19    <none>        80:40003/TCP                                   10d
+mysql                       ClusterIP   None             <none>        3306/TCP                                       31h
+mysql-read                  ClusterIP   10.100.11.41     <none>        3306/TCP                                       31h
+redis-service               NodePort    10.100.1.198     <none>        6379:36379/TCP                                 4d6h
+wordpress-app-spec          NodePort    10.100.247.126   <none>        80:30031/TCP,443:30033/TCP                     6h4m
+zookeeper1                  NodePort    10.100.184.160   <none>        2181:42181/TCP,2888:43385/TCP,3888:39547/TCP   24d
+zookeeper2                  NodePort    10.100.17.68     <none>        2181:42182/TCP,2888:62636/TCP,3888:36521/TCP   24d
+zookeeper3                  NodePort    10.100.146.59    <none>        2181:42183/TCP,2888:34167/TCP,3888:47769/TCP   24d
+```
+
+#### 5.1.4 测试
+
+- step1. 查看zookeeper中的数据和Pod信息是否相符
+
+[ZooInspector下载地址](https://issues.apache.org/jira/secure/attachment/12436620/ZooInspector.zip)
+
+![使用ZooInspector查看zookeeper中的数据](./img/使用ZooInspector查看zookeeper中的数据.png)
+
+数据中显示Pod的IP地址为`10.200.140.76`,查看Pod的IP地址:
+
+![providerPod信息](./img/providerPod信息.png)
+
+- step2. 进入Pod查看duboo日志和端口占用情况
+
+查看dubbo日志:
+
+```
+root@k8s-master-1:~/k8s-data/dubbo-yaml/provider# kubectl exec -it erp-provider-deployment-747df899c4-4z7gb bash -n erp
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+[root@erp-provider-deployment-747df899c4-4z7gb /]# cd /apps/dubbo/provider/logs/
+[root@erp-provider-deployment-747df899c4-4z7gb logs]# tail -f dubbo-demo-provider.log 
+2022-05-21 02:39:39,677 [New I/O server worker #1-1] WARN  com.alibaba.dubbo.remoting.transport.AbstractServer (AbstractServer.java:199) -  [DUBBO] All clients has discontected from /127.0.0.1:20880. You can graceful shutdown now., dubbo version: 2.1.5, current host: 127.0.0.1
+2022-05-21 02:39:41,686 [New I/O server worker #1-2] WARN  com.alibaba.dubbo.remoting.transport.AbstractServer (AbstractServer.java:199) -  [DUBBO] All clients has discontected from /127.0.0.1:20880. You can graceful shutdown now., dubbo version: 2.1.5, current host: 127.0.0.1
+2022-05-21 02:39:43,697 [New I/O server worker #1-1] WARN  com.alibaba.dubbo.remoting.transport.AbstractServer (AbstractServer.java:199) -  [DUBBO] All clients has discontected from /127.0.0.1:20880. You can graceful shutdown now., dubbo version: 2.1.5, current host: 127.0.0.1
+2022-05-21 02:39:45,711 [New I/O server worker #1-2] WARN  com.alibaba.dubbo.remoting.transport.AbstractServer (AbstractServer.java:199) -  [DUBBO] All clients has discontected from /127.0.0.1:20880. You can graceful shutdown now., dubbo version: 2.1.5, current host: 127.0.0.1
+2022-05-21 02:39:47,722 [New I/O server worker #1-1] WARN  com.alibaba.dubbo.remoting.transport.AbstractServer (AbstractServer.java:199) -  [DUBBO] All clients has discontected from /127.0.0.1:20880. You can graceful shutdown now., dubbo version: 2.1.5, current host: 127.0.0.1
+2022-05-21 02:39:49,734 [New I/O server worker #1-2] WARN  com.alibaba.dubbo.remoting.transport.AbstractServer (AbstractServer.java:199) -  [DUBBO] All clients has discontected from /127.0.0.1:20880. You can graceful shutdown now., dubbo version: 2.1.5, current host: 127.0.0.1
+2022-05-21 02:39:51,748 [New I/O server worker #1-1] WARN  com.alibaba.dubbo.remoting.transport.AbstractServer (AbstractServer.java:199) -  [DUBBO] All clients has discontected from /127.0.0.1:20880. You can graceful shutdown now., dubbo version: 2.1.5, current host: 127.0.0.1
+2022-05-21 02:39:53,762 [New I/O server worker #1-2] WARN  com.alibaba.dubbo.remoting.transport.AbstractServer (AbstractServer.java:199) -  [DUBBO] All clients has discontected from /127.0.0.1:20880. You can graceful shutdown now., dubbo version: 2.1.5, current host: 127.0.0.1
+2022-05-21 02:39:55,773 [New I/O server worker #1-1] WARN  com.alibaba.dubbo.remoting.transport.AbstractServer (AbstractServer.java:199) -  [DUBBO] All clients has discontected from /127.0.0.1:20880. You can graceful shutdown now., dubbo version: 2.1.5, current host: 127.0.0.1
+2022-05-21 02:39:57,789 [New I/O server worker #1-2] WARN  com.alibaba.dubbo.remoting.transport.AbstractServer (AbstractServer.java:199) -  [DUBBO] All clients has discontected from /127.0.0.1:20880. You can graceful shutdown now., dubbo version: 2.1.5, current host: 127.0.0.1
+^C
+```
+
+注:这个警告是表示没有客户端连接到该生产者,并不是dubbo出现问题了
+
+端口占用情况:
+
+```
+[root@erp-provider-deployment-747df899c4-4z7gb logs]# ss -tnl
+State      Recv-Q Send-Q                                                                                           Local Address:Port                                                                                                          Peer Address:Port              
+LISTEN     0      50                                                                                                           *:20880                                                                                                                    *:*                  
+[root@erp-provider-deployment-747df899c4-4z7gb logs]# 
+```
+
+### 5.2 K8S运行Customer
+
+#### 5.2.1 构建Customer镜像
+
+- step1. 下载demo
+
+```
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img# mkdir customer
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img# cd customer/
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/customer# ls
+dubbo-demo-consumer-2.1.5-assembly.tar.gz
+```
+
+- step2. 解压缩并修改配置
+
+解压缩:
+
+```
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/customer# tar zxvf dubbo-demo-consumer-2.1.5-assembly.tar.gz 
+dubbo-demo-consumer-2.1.5/bin/
+dubbo-demo-consumer-2.1.5/bin/server.sh
+dubbo-demo-consumer-2.1.5/bin/restart.sh
+dubbo-demo-consumer-2.1.5/bin/start.sh
+dubbo-demo-consumer-2.1.5/bin/stop.sh
+dubbo-demo-consumer-2.1.5/bin/dump.sh
+dubbo-demo-consumer-2.1.5/bin/start.bat
+dubbo-demo-consumer-2.1.5/conf/
+dubbo-demo-consumer-2.1.5/conf/dubbo.properties
+dubbo-demo-consumer-2.1.5/lib/dubbo-demo-2.1.5.jar
+dubbo-demo-consumer-2.1.5/lib/dubbo-2.1.5.jar
+dubbo-demo-consumer-2.1.5/lib/log4j-1.2.16.jar
+dubbo-demo-consumer-2.1.5/lib/javassist-3.15.0-GA.jar
+dubbo-demo-consumer-2.1.5/lib/spring-2.5.6.SEC03.jar
+dubbo-demo-consumer-2.1.5/lib/commons-logging-1.1.1.jar
+dubbo-demo-consumer-2.1.5/lib/netty-3.2.5.Final.jar
+dubbo-demo-consumer-2.1.5/lib/jetty-6.1.26.jar
+dubbo-demo-consumer-2.1.5/lib/jetty-util-6.1.26.jar
+dubbo-demo-consumer-2.1.5/lib/servlet-api-2.5-20081211.jar
+dubbo-demo-consumer-2.1.5/lib/zookeeper-3.3.3.jar
+dubbo-demo-consumer-2.1.5/lib/jline-0.9.94.jar
+dubbo-demo-consumer-2.1.5/lib/jedis-2.0.0.jar
+dubbo-demo-consumer-2.1.5/lib/commons-pool-1.5.5.jar
+dubbo-demo-consumer-2.1.5/lib/mina-core-1.1.7.jar
+dubbo-demo-consumer-2.1.5/lib/slf4j-api-1.6.2.jar
+dubbo-demo-consumer-2.1.5/lib/grizzly-core-2.1.4.jar
+dubbo-demo-consumer-2.1.5/lib/grizzly-framework-2.1.4.jar
+dubbo-demo-consumer-2.1.5/lib/gmbal-api-only-3.0.0-b023.jar
+dubbo-demo-consumer-2.1.5/lib/management-api-3.0.0-b012.jar
+dubbo-demo-consumer-2.1.5/lib/grizzly-portunif-2.1.4.jar
+dubbo-demo-consumer-2.1.5/lib/grizzly-rcm-2.1.4.jar
+dubbo-demo-consumer-2.1.5/lib/httpclient-4.1.2.jar
+dubbo-demo-consumer-2.1.5/lib/httpcore-4.1.2.jar
+dubbo-demo-consumer-2.1.5/lib/commons-codec-1.4.jar
+dubbo-demo-consumer-2.1.5/lib/hessian-4.0.7.jar
+dubbo-demo-consumer-2.1.5/lib/fastjson-1.1.8.jar
+dubbo-demo-consumer-2.1.5/lib/validation-api-1.0.0.GA.jar
+dubbo-demo-consumer-2.1.5/lib/hibernate-validator-4.2.0.Final.jar
+dubbo-demo-consumer-2.1.5/lib/cache-api-0.4.jar
+dubbo-demo-consumer-2.1.5/lib/dubbo-demo-consumer-2.1.5.jar
+tar: A lone zero block at 22566
+```
+
+修改配置:
+
+```
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/customer# cd dubbo-demo-consumer-2.1.5/
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/customer/dubbo-demo-consumer-2.1.5# cd conf/
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/customer/dubbo-demo-consumer-2.1.5/conf# vim dubbo.properties 
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/customer/dubbo-demo-consumer-2.1.5/conf# cat dubbo.properties
+##
+# Copyright 1999-2011 Alibaba Group.
+#  
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#  
+#      http://www.apache.org/licenses/LICENSE-2.0
+#  
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##
+dubbo.container=log4j,spring
+dubbo.application.name=demo-consumer
+dubbo.application.owner=
+dubbo.registry.address=zookeeper://zookeeper1.erp.svc.mycluster.local:2181 | zookeeper://zookeeper2.erp.svc.mycluster.local:2181 | zookeeper://zookeeper3.erp.svc.mycluster.local:2181
+dubbo.monitor.protocol=registry
+dubbo.log4j.file=logs/dubbo-demo-consumer.log
+dubbo.log4j.level=WARN
+```
+
+此处修改的zookeeper地址和provider的zookeeper地址是相同的
+
+- step3. 编写Dockerfile
+
+```
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/customer/dubbo-demo-consumer-2.1.5/conf# cd ..
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/customer/dubbo-demo-consumer-2.1.5# cd ..
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/customer# vim Dockerfile
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/customer# cat Dockerfile
+```
+
+```Dockerfile
+FROM harbor.k8s.com/pub-images/jdk-base:v8.212 
+
+MAINTAINER Roach 40486453@qq.com
+
+RUN yum install file -y
+RUN mkdir -p /apps/dubbo/consumer 
+ADD dubbo-demo-consumer-2.1.5  /apps/dubbo/consumer
+ADD run_java.sh /apps/dubbo/consumer/bin 
+RUN chown nginx.nginx /apps -R
+RUN chmod a+x /apps/dubbo/consumer/bin/*.sh
+
+CMD ["/apps/dubbo/consumer/bin/run_java.sh"]
+```
+
+- step4. 编写启动脚本
+
+```
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/customer# vim run_java.sh
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/customer# cat run_java.sh
+```
+
+```sh
+#!/bin/bash
+su - nginx -c "/apps/dubbo/consumer/bin/start.sh"
+tail -f /etc/hosts
+```
+
+- step5. 编写构建镜像脚本
+
+```
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/customer# vim build-command.sh
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/customer# cat build-command.sh
+```
+
+```sh
+#!/bin/bash
+TAG=$1
+docker build -t harbor.k8s.com/erp/dubbo-demo-consumer:${TAG} . --network=host
+sleep 3
+docker push harbor.k8s.com/erp/dubbo-demo-consumer:${TAG}
+```
+
+- step6. 构建镜像
+
+```
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/customer# chmod a+x *.sh
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/customer# bash build-command.sh v1
+Sending build context to Docker daemon  21.84MB
+Step 1/9 : FROM harbor.k8s.com/pub-images/jdk-base:v8.212
+ ---> 7e075f036c9b
+Step 2/9 : MAINTAINER Roach 40486453@qq.com
+ ---> Using cache
+ ---> 16122955f193
+Step 3/9 : RUN yum install file -y
+ ---> Running in 3eb5b58434d4
+Loaded plugins: fastestmirror, ovl
+Determining fastest mirrors
+ * base: mirrors.bfsu.edu.cn
+ * extras: mirrors.bfsu.edu.cn
+ * updates: mirrors.huaweicloud.com
+Resolving Dependencies
+...
+Successfully built 87454f52c39b
+Successfully tagged harbor.k8s.com/erp/dubbo-demo-consumer:v1
+The push refers to repository [harbor.k8s.com/erp/dubbo-demo-consumer]
+e755c3b5707c: Pushed 
+870108ea1ca7: Pushed 
+284e45a702e1: Pushed 
+304d27f073e1: Pushed 
+28ba5c0d9bdc: Pushed 
+f5892a688ceb: Pushed 
+039fc3b13371: Mounted from erp/dubbo-demo-provider 
+4ac69e34cb8f: Mounted from erp/dubbo-demo-provider 
+2ee5b94985e2: Mounted from erp/dubbo-demo-provider 
+9af9a18fb5a7: Mounted from erp/dubbo-demo-provider 
+0c09dd020e8e: Mounted from erp/dubbo-demo-provider 
+fb82b029bea0: Mounted from erp/dubbo-demo-provider 
+v1: digest: sha256:6a620acb2077545ebd13e5283ae229f9dd550aea18e3a256c5494b29519bd35f size: 2840
+```
+
+#### 5.2.2 创建Customer Pod
+
+```
+root@k8s-master-1:~/k8s-data/dubbo-yaml# mkdir customer
+root@k8s-master-1:~/k8s-data/dubbo-yaml# cd customer/
+root@k8s-master-1:~/k8s-data/dubbo-yaml/customer# vim customer-deployment.yaml
+root@k8s-master-1:~/k8s-data/dubbo-yaml/customer# cat customer-deployment.yaml
+```
+
+```yaml
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: erp-consumer
+  name: erp-consumer-deployment
+  namespace: erp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: erp-consumer
+  template:
+    metadata:
+      labels:
+        app: erp-consumer
+    spec:
+      containers:
+      - name: erp-consumer-container
+        image: harbor.k8s.com/erp/dubbo-demo-consumer:v1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          protocol: TCP
+          name: http
+```
+
+```
+root@k8s-master-1:~/k8s-data/dubbo-yaml/customer# kubectl apply -f customer-deployment.yaml 
+deployment.apps/erp-consumer-deployment created
+root@k8s-master-1:~/k8s-data/dubbo-yaml/customer# kubectl get pod -n erp
+NAME                                            READY   STATUS    RESTARTS   AGE
+erp-consumer-deployment-79d5876d79-5wxx4        1/1     Running   0          7s
+erp-jenkins-deployment-696696cb65-b79sr         1/1     Running   0          12h
+erp-nginx-webapp-deployment-65fb86d9f6-8mhhb    1/1     Running   6          14h
+erp-provider-deployment-747df899c4-4z7gb        1/1     Running   0          41m
+erp-tomcat-webapp-deployment-84bbf6b865-fdq8z   1/1     Running   1          14h
+mysql-0                                         2/2     Running   2          13h
+mysql-1                                         2/2     Running   2          13h
+mysql-2                                         2/2     Running   2          13h
+redis-deployment-6d85975b47-9nns2               1/1     Running   1          14h
+wordpress-app-deployment-7fcb55bd59-l745v       2/2     Running   0          6h48m
+zookeeper1-7ff6fbfbf-pstf9                      1/1     Running   1          14h
+zookeeper2-94cfd4596-z56n9                      1/1     Running   1          14h
+zookeeper3-7f55657779-62hvf                     1/1     Running   1          14h
+```
+
+#### 5.2.3 创建Customer Service
+
+```
+root@k8s-master-1:~/k8s-data/dubbo-yaml/customer# vim customer-service.yaml
+root@k8s-master-1:~/k8s-data/dubbo-yaml/customer# cat customer-service.yaml
+```
+
+```yaml
+kind: Service
+apiVersion: v1
+metadata:
+  labels:
+    app: erp-consumer
+  name: erp-consumer-service
+  namespace: erp
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: erp-consumer
+```
+
+```
+root@k8s-master-1:~/k8s-data/dubbo-yaml/customer# kubectl apply -f customer-service.yaml 
+service/erp-consumer-service created
+root@k8s-master-1:~/k8s-data/dubbo-yaml/customer# kubectl get svc -n erp
+NAME                        TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                                        AGE
+erp-consumer-service        NodePort    10.100.77.189    <none>        80:49341/TCP                                   7s
+erp-jenkins-service         NodePort    10.100.192.166   <none>        80:38080/TCP                                   12h
+erp-nginx-webapp-service    NodePort    10.100.9.36      <none>        80:40002/TCP,443:40443/TCP                     24d
+erp-provider-service        NodePort    10.100.0.236     <none>        80:45130/TCP                                   41m
+erp-tomcat-webapp-service   NodePort    10.100.139.19    <none>        80:40003/TCP                                   10d
+mysql                       ClusterIP   None             <none>        3306/TCP                                       32h
+mysql-read                  ClusterIP   10.100.11.41     <none>        3306/TCP                                       32h
+redis-service               NodePort    10.100.1.198     <none>        6379:36379/TCP                                 4d6h
+wordpress-app-spec          NodePort    10.100.247.126   <none>        80:30031/TCP,443:30033/TCP                     6h45m
+zookeeper1                  NodePort    10.100.184.160   <none>        2181:42181/TCP,2888:43385/TCP,3888:39547/TCP   24d
+zookeeper2                  NodePort    10.100.17.68     <none>        2181:42182/TCP,2888:62636/TCP,3888:36521/TCP   24d
+zookeeper3                  NodePort    10.100.146.59    <none>        2181:42183/TCP,2888:34167/TCP,3888:47769/TCP   24d
+```
+
+#### 5.2.4 测试
+
+- step1. 查看zookeeper中的customer数据
+
+![使用ZooInspector查看zookeeper中customer的数据](./img/使用ZooInspector查看zookeeper中customer的数据.png)
+
+![customerPod信息](./img/customerPod信息.png)
+
+可以看到,IP地址信息是相符的
+
+- step2. 到provider中追踪日志
+
+```
+root@k8s-master-1:~/k8s-data/dubbo-yaml/customer# kubectl exec -it erp-provider-deployment-747df899c4-4z7gb bash -n erp
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+[root@erp-provider-deployment-747df899c4-4z7gb /]# cd /apps/dubbo/provider/logs/
+[root@erp-provider-deployment-747df899c4-4z7gb logs]# tail -f stdout.log 
+[03:27:36] Hello world236, request from consumer: /10.200.140.74:60130
+[03:27:38] Hello world237, request from consumer: /10.200.140.74:60130
+[03:27:40] Hello world238, request from consumer: /10.200.140.74:60130
+[03:27:42] Hello world239, request from consumer: /10.200.140.74:60130
+[03:27:44] Hello world240, request from consumer: /10.200.140.74:60130
+[03:27:46] Hello world241, request from consumer: /10.200.140.74:60130
+[03:27:48] Hello world242, request from consumer: /10.200.140.74:60130
+[03:27:50] Hello world243, request from consumer: /10.200.140.74:60130
+[03:27:52] Hello world244, request from consumer: /10.200.140.74:60130
+[03:27:54] Hello world245, request from consumer: /10.200.140.74:60130
+[03:27:56] Hello world246, request from consumer: /10.200.140.74:60130
+[03:27:58] Hello world247, request from consumer: /10.200.140.74:60130
+^C
+```
+
+整体通信流程如图所示:
+
+![消费者与生产者通过注册中心通信的过程](./img/消费者与生产者通过注册中心通信的过程.png)
+
+### 5.3 K8S运行dubbo admin
+
+dubbo admin相当于一个管理端,起到一个monitor的作用.并非必需品.
+
+#### 5.3.1 构建镜像
+
+- step1. 拉取镜像
+
+```
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/admin# docker pull apache/dubbo-admin:0.4.0
+0.4.0: Pulling from apache/dubbo-admin
+647acf3d48c2: Pull complete 
+b02967ef0034: Pull complete 
+e1ad2231829e: Pull complete 
+3accde8486ae: Pull complete 
+39bc74563c28: Pull complete 
+f0455cc186e3: Pull complete 
+261a68d319f8: Pull complete 
+fd80c9396349: Pull complete 
+e90d021aa5a9: Pull complete 
+Digest: sha256:17e3a246848c7331a18542b73006fb7c0ec0fda767ee788fc164ad8fa52c0600
+Status: Downloaded newer image for apache/dubbo-admin:0.4.0
+docker.io/apache/dubbo-admin:0.4.0
+```
+
+- step2. 推送镜像
+
+```
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/admin# docker tag apache/dubbo-admin:0.4.0 harbor.k8s.com/erp/dubboadmin:v1
+root@ks8-harbor-2:/opt/k8s-data/dubbo-img/admin# docker push harbor.k8s.com/erp/dubboadmin:v1
+The push refers to repository [harbor.k8s.com/erp/dubboadmin]
+f42e7bbf7527: Pushed 
+e591dd24c9e2: Pushed 
+33880ed71840: Pushed 
+d4f4648dec26: Pushed 
+0ec71953e0a3: Pushed 
+50ae39e22ba5: Pushed 
+a4aba4e59b40: Pushed 
+5499f2905579: Pushed 
+a36ba9e322f7: Pushed 
+v1: digest: sha256:17e3a246848c7331a18542b73006fb7c0ec0fda767ee788fc164ad8fa52c0600 size: 2213
+```
+
+#### 5.3.2 创建Pod
+
+```
+root@k8s-master-1:~/k8s-data/dubbo-yaml/admin# vim admin-deployment.yaml 
+root@k8s-master-1:~/k8s-data/dubbo-yaml/admin# cat admin-deployment.yaml
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dubbo-admin-deploy
+  namespace: erp
+  labels:
+    app: dubbo-admin-deploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dubbo-admin
+  template:
+    metadata:
+      labels:
+        app: dubbo-admin
+    spec:
+      containers:
+        - name: dubbo-admin
+          image: harbor.k8s.com/erp/dubboadmin:v1
+          imagePullPolicy: Always
+          command: [ "/bin/bash", "-ce", "java -Dadmin.registry.address=zookeeper://zookeeper1.erp.svc.mycluster.local:2181 -Dadmin.config-center=zookeeper://zookeeper1.erp.svc.mycluster.local:2181 -Dadmin.metadata-report.address=zookeeper://zookeeper1.erp.svc.mycluster.local:2181 -jar /app.jar"]
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 60 
+            periodSeconds: 20
+```
+
+```
+root@k8s-master-1:~/k8s-data/dubbo-yaml/admin# kubectl apply -f admin-deployment.yaml 
+deployment.apps/dubbo-admin-deploy created
+root@k8s-master-1:~/k8s-data/dubbo-yaml/admin# kubectl get pod -n erp
+NAME                                            READY   STATUS    RESTARTS   AGE
+dubbo-admin-deploy-697654f7d9-htbjn             1/1     Running   0          91s
+erp-consumer-deployment-79d5876d79-5wxx4        1/1     Running   0          163m
+erp-jenkins-deployment-696696cb65-b79sr         1/1     Running   0          14h
+erp-nginx-webapp-deployment-65fb86d9f6-8mhhb    1/1     Running   6          17h
+erp-provider-deployment-747df899c4-4z7gb        1/1     Running   0          3h24m
+erp-tomcat-webapp-deployment-84bbf6b865-fdq8z   1/1     Running   1          17h
+mysql-0                                         2/2     Running   2          16h
+mysql-1                                         2/2     Running   2          16h
+mysql-2                                         2/2     Running   2          16h
+redis-deployment-6d85975b47-9nns2               1/1     Running   1          17h
+wordpress-app-deployment-7fcb55bd59-l745v       2/2     Running   0          9h
+zookeeper1-7ff6fbfbf-pstf9                      1/1     Running   1          17h
+zookeeper2-94cfd4596-z56n9                      1/1     Running   1          17h
+zookeeper3-7f55657779-62hvf                     1/1     Running   1          17h
+```
+
+注:由于配置了就绪探针,所以该Pod需要等待1分钟后才能运行
+
+#### 5.3.3 创建Service
+
+```
+root@k8s-master-1:~/k8s-data/dubbo-yaml/admin# vim admin-service.yaml 
+root@k8s-master-1:~/k8s-data/dubbo-yaml/admin# cat admin-service.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: dubbo-admin-service
+  namespace: erp
+  labels:
+    app: dubbo-admin-service
+spec:
+  selector:
+    app: dubbo-admin
+  type: NodePort
+  ports:
+    - name: dubbo-admin-8080
+      port: 8080
+      targetPort: 8080
+      nodePort: 30088
+```
+
+```
+root@k8s-master-1:~/k8s-data/dubbo-yaml/admin# kubectl apply -f admin-service.yaml 
+service/dubbo-admin-service created
+root@k8s-master-1:~/k8s-data/dubbo-yaml/admin# kubectl get svc -n erp
+NAME                        TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                                        AGE
+dubbo-admin-service         NodePort    10.100.87.210    <none>        8080:30088/TCP                                 11s
+erp-consumer-service        NodePort    10.100.77.189    <none>        80:49341/TCP                                   162m
+erp-jenkins-service         NodePort    10.100.192.166   <none>        80:38080/TCP                                   14h
+erp-nginx-webapp-service    NodePort    10.100.9.36      <none>        80:40002/TCP,443:40443/TCP                     24d
+erp-provider-service        NodePort    10.100.0.236     <none>        80:45130/TCP                                   3h23m
+erp-tomcat-webapp-service   NodePort    10.100.139.19    <none>        80:40003/TCP                                   10d
+mysql                       ClusterIP   None             <none>        3306/TCP                                       34h
+mysql-read                  ClusterIP   10.100.11.41     <none>        3306/TCP                                       34h
+redis-service               NodePort    10.100.1.198     <none>        6379:36379/TCP                                 4d9h
+wordpress-app-spec          NodePort    10.100.247.126   <none>        80:30031/TCP,443:30033/TCP                     9h
+zookeeper1                  NodePort    10.100.184.160   <none>        2181:42181/TCP,2888:43385/TCP,3888:39547/TCP   24d
+zookeeper2                  NodePort    10.100.17.68     <none>        2181:42182/TCP,2888:62636/TCP,3888:36521/TCP   24d
+zookeeper3                  NodePort    10.100.146.59    <none>        2181:42183/TCP,2888:34167/TCP,3888:47769/TCP   24d
+```
+
+#### 5.3.4 测试
+
+![访问dubbo-admin服务](./img/访问dubbo-admin服务.png)
+
+注:默认用户名密码均为root
+
+## PART6. Ingress简介
+
+### 6.1 K8S Service的类型
+
+[服务类型](https://kubernetes.io/zh/docs/concepts/services-networking/service/#publishing-services-service-types)
+
+#### a. ClusterIP
+
+ClusterIP:默认的类型,用于k8s内部之间的服务访问.即通过内部的service ip实现服务间的访问,service IP仅可以在内部访问,不能从外部访问.
+
+#### b. NodePort
+
+NodePort:在cluster IP的基础之上,通过在每个node节点监听一个可以指定的宿主机端口(nodePort)来暴露服务,从而允许外部client访问k8s集群中的服务,nodePort把外部client的请求转发至service进行处理.
+
+#### c. LoadBalancer
+
+LoadBalancer:主要在公有云如阿里云、AWS上使用,LoadBalancer构建在nodePort基础之上,通过公有云服务商提供的负载均衡器将k8s集群中的服务暴露给集群外部的client访问.
+
+#### d. ExternalName
+
+ExternalName:用于将k8s集群外部的服务映射至k8s集群内部访问,从而让集群内部的pod能够通过固定的service name访问集群外部的服务,有时候也用于将不同namespace之间的pod通过ExternalName进行访问.
+
+可以通过`kubectl explain service.spec.type`查看service类型
+
+#### e. Ingress
+
+[Ingress](https://kubernetes.io/zh/docs/concepts/services-networking/ingress/)是kubernetes API中的标准资源类型之一,ingress实现的功能是将客户端请求的host名称或请求的URL路径转发到指定的service资源的规则,即用于将kubernetes集群外部的请求资源转发至集群内部的service,再被service转发至pod处理客户端的请求.
+
+[Ingress Controller](https://kubernetes.io/zh/docs/concepts/services-networking/ingress-controllers/):Ingress资源需要指定监听地址、请求的host和URL等配置,然后根据这些规则的匹配机制将客户端的请求进行转发,这种能够为ingress配置资源监听并转发流量的组件称为ingress控制器(ingress controller).ingress controller是kubernetes的一个附件,类似于dashboard或者flannel一样,需要单独部署.
+
+Ingress基于应用层,可以实现类似于nginx的七层代理与https等功能.Ingress基于NodePort,在NodePort的基础上又衍生出的另一种暴露K8S内部服务的方式.
+
+Ingress工作在第7层(应用层),类似nginx.Ingress的工作方式为:在NodePort的基础上,在K8S内部内置一个7层的负载均衡器.也就是说流量是先到Ingress上,在Ingress做一些配置,用于匹配用户请求的域名、端口、请求方式等信息.匹配成功后再将请求转发给后边的Service.
+
+![Ingress常用结构](./img/Ingress常用结构.jpg)
+
+![Ingress工作流程](./img/Ingress工作流程.png)
+
+[Ingress选型](https://kubernetes.io/zh/docs/concepts/services-networking/ingress-controllers/)
+
+![Ingress工作方式](./img/Ingress工作方式.png)
+
+Ingress主进程读取配置,然后根据配置创建线程.类似于nginx的master进程和worker进程之间的关系.
+
+使用Ingress的优点:入口唯一,这样管理起来就比较方便.
+
+使用Ingress的缺点:当流量较大时,Ingress会成为性能瓶颈.
+
+### 6.2 运行Ingress Controller
+
+#### 6.2.1 镜像准备
+
+##### a. nginx-ingress-controller镜像
+
+```
+root@ks8-harbor-2:~# docker pull quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.33.0
+0.33.0: Pulling from kubernetes-ingress-controller/nginx-ingress-controller
+cbdbe7a5bc2a: Pull complete 
+11f3b8b7eea2: Pull complete 
+8914224c9c90: Pull complete 
+42d2a0e40de7: Pull complete 
+b306c26b2152: Pull complete 
+0e937a600754: Pull complete 
+8a92de035314: Pull complete 
+09a3a6adb7ed: Pull complete 
+966ec1120b67: Pull complete 
+1b7b41b3144e: Pull complete 
+59fc0191cff0: Pull complete 
+c3c2bd8bcea6: Pull complete 
+24b8b0282442: Pull complete 
+7f21ee2ccc91: Pull complete 
+1b47f1fd101a: Pull complete 
+Digest: sha256:fc650620719e460df04043512ec4af146b7d9da163616960e58aceeaf4ea5ba1
+Status: Downloaded newer image for quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.33.0
+quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.33.0
+root@ks8-harbor-2:~# docker tag quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.33.0 harbor.k8s.com/ingress/nginx-ingress-controller:0.33.0
+root@ks8-harbor-2:~# docker push harbor.k8s.com/ingress/nginx-ingress-controller:0.33.0
+The push refers to repository [harbor.k8s.com/ingress/nginx-ingress-controller]
+c1a19c5d6c1c: Pushed 
+ad2b0c034668: Pushed 
+435bd169fb0e: Pushed 
+cad00259deb3: Pushed 
+fc61ccffc2c4: Pushed 
+63fc60852e71: Pushed 
+7f16463c2512: Pushed 
+02a3a18a366c: Pushed 
+7cd38015fddc: Pushed 
+a46fe26caee6: Pushed 
+af89a9a077ee: Pushed 
+c4d79695750f: Pushed 
+a00053f4b396: Pushed 
+72d93ca3d27e: Pushed 
+3e207b409db3: Pushed 
+0.33.0: digest: sha256:98b48d756cf01fcf223f19dc5ea7514a395077ccb0e4af2f150956ad3f8a908e size: 3464
+```
+
+##### b. kube-webhook-certgen镜像
+
+```
+root@ks8-harbor-2:~# docker pull jettech/kube-webhook-certgen:v1.2.0
+v1.2.0: Pulling from jettech/kube-webhook-certgen
+9ff2acc3204b: Pull complete 
+69e2f037cdb3: Pull complete 
+8ac3c60fe81d: Pull complete 
+Digest: sha256:c6f018afe5dfce02110b332ea75bb846144e65d4993c7534886d8505a6960357
+Status: Downloaded newer image for jettech/kube-webhook-certgen:v1.2.0
+docker.io/jettech/kube-webhook-certgen:v1.2.0
+root@ks8-harbor-2:~# docker tag docker.io/jettech/kube-webhook-certgen:v1.2.0 harbor.k8s.com/ingress/kube-webhook-certgen:v1.2.0
+root@ks8-harbor-2:~# docker push harbor.k8s.com/ingress/kube-webhook-certgen:v1.2.0
+The push refers to repository [harbor.k8s.com/ingress/kube-webhook-certgen]
+26090dab1e9e: Pushed 
+f47163e8de57: Pushed 
+0d1435bd79e4: Pushed 
+v1.2.0: digest: sha256:a5130405b0476373946b5c8f25a5506d0e4e480afb803ef0f0908a5ffd14111a size: 950
+```
+
+#### 6.2.2 创建Pod
+
+```
+root@k8s-master-1:~# cd ~/k8s-data/
+root@k8s-master-1:~/k8s-data# mkdir ingress
+root@k8s-master-1:~/k8s-data# cd ingress/
+root@k8s-master-1:~/k8s-data/ingress# vim ingress-controller-deploy.yaml
+root@k8s-master-1:~/k8s-data/ingress# cat ingress-controller-deploy.yaml
+```
+
+```yaml
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+
+---
+# Source: ingress-nginx/templates/controller-serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: controller
+  name: ingress-nginx
+  namespace: ingress-nginx
+---
+# Source: ingress-nginx/templates/controller-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: controller
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+data:
+---
+# Source: ingress-nginx/templates/clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+  name: ingress-nginx
+  namespace: ingress-nginx
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - configmaps
+      - endpoints
+      - nodes
+      - pods
+      - secrets
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+      - ''
+    resources:
+      - nodes
+    verbs:
+      - get
+  - apiGroups:
+      - ''
+    resources:
+      - services
+    verbs:
+      - get
+      - list
+      - update
+      - watch
+  - apiGroups:
+      - extensions
+      - networking.k8s.io   # k8s 1.14+
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ''
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+  - apiGroups:
+      - extensions
+      - networking.k8s.io   # k8s 1.14+
+    resources:
+      - ingresses/status
+    verbs:
+      - update
+  - apiGroups:
+      - networking.k8s.io   # k8s 1.14+
+    resources:
+      - ingressclasses
+    verbs:
+      - get
+      - list
+      - watch
+---
+# Source: ingress-nginx/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+  name: ingress-nginx
+  namespace: ingress-nginx
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ingress-nginx
+subjects:
+  - kind: ServiceAccount
+    name: ingress-nginx
+    namespace: ingress-nginx
+---
+# Source: ingress-nginx/templates/controller-role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: controller
+  name: ingress-nginx
+  namespace: ingress-nginx
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - namespaces
+    verbs:
+      - get
+  - apiGroups:
+      - ''
+    resources:
+      - configmaps
+      - pods
+      - secrets
+      - endpoints
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ''
+    resources:
+      - services
+    verbs:
+      - get
+      - list
+      - update
+      - watch
+  - apiGroups:
+      - extensions
+      - networking.k8s.io   # k8s 1.14+
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+      - networking.k8s.io   # k8s 1.14+
+    resources:
+      - ingresses/status
+    verbs:
+      - update
+  - apiGroups:
+      - networking.k8s.io   # k8s 1.14+
+    resources:
+      - ingressclasses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ''
+    resources:
+      - configmaps
+    resourceNames:
+      - ingress-controller-leader-nginx
+    verbs:
+      - get
+      - update
+  - apiGroups:
+      - ''
+    resources:
+      - configmaps
+    verbs:
+      - create
+  - apiGroups:
+      - ''
+    resources:
+      - endpoints
+    verbs:
+      - create
+      - get
+      - update
+  - apiGroups:
+      - ''
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+---
+# Source: ingress-nginx/templates/controller-rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: controller
+  name: ingress-nginx
+  namespace: ingress-nginx
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ingress-nginx
+subjects:
+  - kind: ServiceAccount
+    name: ingress-nginx
+    namespace: ingress-nginx
+---
+# Source: ingress-nginx/templates/controller-service-webhook.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: controller
+  name: ingress-nginx-controller-admission
+  namespace: ingress-nginx
+spec:
+  type: ClusterIP
+  ports:
+    - name: https-webhook
+      port: 443
+      targetPort: webhook
+  selector:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/component: controller
+---
+# Source: ingress-nginx/templates/controller-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: controller
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: http
+      # 指定ingress-nginx-controller的监听端口
+      nodePort: 40080
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: https
+      # 指定ingress-nginx-controller的监听端口
+      nodePort: 40444
+  selector:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/component: controller
+---
+# Source: ingress-nginx/templates/controller-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: controller
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ingress-nginx
+      app.kubernetes.io/instance: ingress-nginx
+      app.kubernetes.io/component: controller
+  revisionHistoryLimit: 10
+  minReadySeconds: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ingress-nginx
+        app.kubernetes.io/instance: ingress-nginx
+        app.kubernetes.io/component: controller
+    spec:
+      dnsPolicy: ClusterFirst
+      hostNetwork: true
+      containers:
+        - name: controller
+          image: harbor.k8s.com/ingress/nginx-ingress-controller:0.33.0
+          imagePullPolicy: IfNotPresent
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /wait-shutdown
+          args:
+            - /nginx-ingress-controller
+            - --election-id=ingress-controller-leader
+            - --ingress-class=nginx
+            - --configmap=ingress-nginx/ingress-nginx-controller
+            - --validating-webhook=:8443
+            - --validating-webhook-certificate=/usr/local/certificates/cert
+            - --validating-webhook-key=/usr/local/certificates/key
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_BIND_SERVICE
+            runAsUser: 101
+            allowPrivilegeEscalation: true
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 10254
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 10254
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: https
+              containerPort: 443
+              protocol: TCP
+            - name: webhook
+              containerPort: 8443
+              protocol: TCP
+          volumeMounts:
+            - name: webhook-cert
+              mountPath: /usr/local/certificates/
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 90Mi
+      serviceAccountName: ingress-nginx
+      terminationGracePeriodSeconds: 300
+      volumes:
+        - name: webhook-cert
+          secret:
+            secretName: ingress-nginx-admission
+---
+# Source: ingress-nginx/templates/admission-webhooks/validating-webhook.yaml
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: admission-webhook
+  name: ingress-nginx-admission
+  namespace: ingress-nginx
+webhooks:
+  - name: validate.nginx.ingress.kubernetes.io
+    rules:
+      - apiGroups:
+          - extensions
+          - networking.k8s.io
+        apiVersions:
+          - v1beta1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - ingresses
+    failurePolicy: Fail
+    clientConfig:
+      service:
+        namespace: ingress-nginx
+        name: ingress-nginx-controller-admission
+        path: /extensions/v1beta1/ingresses
+---
+# Source: ingress-nginx/templates/admission-webhooks/job-patch/clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ingress-nginx-admission
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade,post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: admission-webhook
+  namespace: ingress-nginx
+rules:
+  - apiGroups:
+      - admissionregistration.k8s.io
+    resources:
+      - validatingwebhookconfigurations
+    verbs:
+      - get
+      - update
+---
+# Source: ingress-nginx/templates/admission-webhooks/job-patch/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ingress-nginx-admission
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade,post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: admission-webhook
+  namespace: ingress-nginx
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ingress-nginx-admission
+subjects:
+  - kind: ServiceAccount
+    name: ingress-nginx-admission
+    namespace: ingress-nginx
+---
+# Source: ingress-nginx/templates/admission-webhooks/job-patch/job-createSecret.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ingress-nginx-admission-create
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: admission-webhook
+  namespace: ingress-nginx
+spec:
+  template:
+    metadata:
+      name: ingress-nginx-admission-create
+      labels:
+        helm.sh/chart: ingress-nginx-2.4.0
+        app.kubernetes.io/name: ingress-nginx
+        app.kubernetes.io/instance: ingress-nginx
+        app.kubernetes.io/version: 0.33.0
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: admission-webhook
+    spec:
+      containers:
+        - name: create
+          image: harbor.k8s.com/ingress/kube-webhook-certgen:v1.2.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - create
+            - --host=ingress-nginx-controller-admission,ingress-nginx-controller-admission.ingress-nginx.svc
+            - --namespace=ingress-nginx
+            - --secret-name=ingress-nginx-admission
+      restartPolicy: OnFailure
+      serviceAccountName: ingress-nginx-admission
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 2000
+---
+# Source: ingress-nginx/templates/admission-webhooks/job-patch/job-patchWebhook.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ingress-nginx-admission-patch
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: admission-webhook
+  namespace: ingress-nginx
+spec:
+  template:
+    metadata:
+      name: ingress-nginx-admission-patch
+      labels:
+        helm.sh/chart: ingress-nginx-2.4.0
+        app.kubernetes.io/name: ingress-nginx
+        app.kubernetes.io/instance: ingress-nginx
+        app.kubernetes.io/version: 0.33.0
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: admission-webhook
+    spec:
+      containers:
+        - name: patch
+          image: harbor.k8s.com/ingress/kube-webhook-certgen:v1.2.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - patch
+            - --webhook-name=ingress-nginx-admission
+            - --namespace=ingress-nginx
+            - --patch-mutating=false
+            - --secret-name=ingress-nginx-admission
+            - --patch-failure-policy=Fail
+      restartPolicy: OnFailure
+      serviceAccountName: ingress-nginx-admission
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 2000
+---
+# Source: ingress-nginx/templates/admission-webhooks/job-patch/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ingress-nginx-admission
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade,post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: admission-webhook
+  namespace: ingress-nginx
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - secrets
+    verbs:
+      - get
+      - create
+---
+# Source: ingress-nginx/templates/admission-webhooks/job-patch/rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ingress-nginx-admission
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade,post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: admission-webhook
+  namespace: ingress-nginx
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ingress-nginx-admission
+subjects:
+  - kind: ServiceAccount
+    name: ingress-nginx-admission
+    namespace: ingress-nginx
+---
+# Source: ingress-nginx/templates/admission-webhooks/job-patch/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ingress-nginx-admission
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade,post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+  labels:
+    helm.sh/chart: ingress-nginx-2.4.0
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: 0.33.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: admission-webhook
+  namespace: ingress-nginx
+```
+
+```
+root@k8s-master-1:~/k8s-data/ingress# kubectl apply -f ingress-controller-deploy.yaml 
+namespace/ingress-nginx created
+serviceaccount/ingress-nginx created
+configmap/ingress-nginx-controller created
+clusterrole.rbac.authorization.k8s.io/ingress-nginx created
+clusterrolebinding.rbac.authorization.k8s.io/ingress-nginx created
+role.rbac.authorization.k8s.io/ingress-nginx created
+rolebinding.rbac.authorization.k8s.io/ingress-nginx created
+service/ingress-nginx-controller-admission created
+service/ingress-nginx-controller created
+deployment.apps/ingress-nginx-controller created
+Warning: admissionregistration.k8s.io/v1beta1 ValidatingWebhookConfiguration is deprecated in v1.16+, unavailable in v1.22+; use admissionregistration.k8s.io/v1 ValidatingWebhookConfiguration
+validatingwebhookconfiguration.admissionregistration.k8s.io/ingress-nginx-admission created
+clusterrole.rbac.authorization.k8s.io/ingress-nginx-admission created
+clusterrolebinding.rbac.authorization.k8s.io/ingress-nginx-admission created
+job.batch/ingress-nginx-admission-create created
+job.batch/ingress-nginx-admission-patch created
+role.rbac.authorization.k8s.io/ingress-nginx-admission created
+rolebinding.rbac.authorization.k8s.io/ingress-nginx-admission created
+serviceaccount/ingress-nginx-admission created
+root@k8s-master-1:~/k8s-data/ingress# kubectl get pod -n ingress-nginx
+NAME                                        READY   STATUS      RESTARTS   AGE
+ingress-nginx-admission-create-f5jhh        0/1     Completed   0          32s
+ingress-nginx-admission-patch-sf87d         0/1     Completed   1          32s
+ingress-nginx-controller-7b6c74cf4c-c9fkg   0/1     Running     0          43s
+```
+
+注:本段yaml文件是直接从[官方文档](https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.2.0/deploy/static/provider/cloud/deploy.yaml)上抄过来的,具体是啥意思我也不知道
+
+![访问nginx-ingress](./img/访问nginx-ingress.png)
+
+### 6.3 实现单个域名的Ingress
+
+这种场景下,域名和Service的关系是1对1.
+
+#### 6.3.1 构建服务
+
+Ingress是用于代理后边的服务的,因此先要有一个服务.
+
+```
+root@k8s-master-1:~/k8s-data/ingress# kubectl get svc -n erp
+NAME                        TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                                        AGE
+dubbo-admin-service         NodePort    10.100.87.210    <none>        8080:30088/TCP                                 42h
+erp-consumer-service        NodePort    10.100.77.189    <none>        80:49341/TCP                                   45h
+erp-jenkins-service         NodePort    10.100.192.166   <none>        80:38080/TCP                                   2d9h
+erp-nginx-webapp-service    NodePort    10.100.9.36      <none>        80:40002/TCP,443:40443/TCP                     25d
+erp-provider-service        NodePort    10.100.0.236     <none>        80:45130/TCP                                   46h
+erp-tomcat-webapp-service   NodePort    10.100.139.19    <none>        80:40003/TCP                                   12d
+mysql                       ClusterIP   None             <none>        3306/TCP                                       3d5h
+mysql-read                  ClusterIP   10.100.11.41     <none>        3306/TCP                                       3d5h
+redis-service               NodePort    10.100.1.198     <none>        6379:36379/TCP                                 6d4h
+wordpress-app-spec          NodePort    10.100.247.126   <none>        80:30031/TCP,443:30033/TCP                     2d4h
+zookeeper1                  NodePort    10.100.184.160   <none>        2181:42181/TCP,2888:43385/TCP,3888:39547/TCP   26d
+zookeeper2                  NodePort    10.100.17.68     <none>        2181:42182/TCP,2888:62636/TCP,3888:36521/TCP   26d
+zookeeper3                  NodePort    10.100.146.59    <none>        2181:42183/TCP,2888:34167/TCP,3888:47769/TCP   26d
+```
+
+此处我们使用之前构建的[`erp-tomcat-webapp-service`](https://github.com/rayallen20/K8SBaseStudy/blob/master/day8-kubernetes/day8-kubernetes.md#152-%E5%88%9B%E5%BB%BAservice)作为Ingress代理的服务.
+
+#### 6.3.2 创建规则
+
+```
+root@k8s-master-1:~/k8s-data/ingress# vim ingress-single-host.yaml
+root@k8s-master-1:~/k8s-data/ingress# cat ingress-single-host.yaml
+```
+
+```yaml
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-tomcat-webapp
+  # ingress必须和要代理的service处于同一个namespace下
+  namespace: erp
+  annotations:
+    # 指定Ingress Controller的类型
+    kubernetes.io/ingress.class: "nginx"
+    # SSL重定向 即:将http请求强制重定向为https请求
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # 指定rules定义的path可以使用正则表达式
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    # 连接超时时间 单位:秒 默认为5s
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    # 后端服务器回转数据的超时时间 单位:秒 默认为60s
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    # 后端服务器响应超时时间 单位:秒 默认为60s
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    # 客户端上传文件最大大小 默认为20m
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    # URL重写
+    # nginx.ingress.kubernetes.io/rewrite-target: /
+    # 若用户请求的URL不存在 跳到哪个URL
+    nginx.ingress.kubernetes.io/app-root: /myapp/app/index.html
+spec:
+  # 路由规则
+  rules:
+    # 客户端访问的host域名
+    - host: www.tomcatapp.com
+      http:
+        paths:
+          # path没有指定 则表示整个域名的转发规则
+          - path:
+            backend:
+              # 指定转发的service
+              serviceName: erp-tomcat-webapp-service
+              # 转发的service的端口号
+              servicePort: 80
+```
+
+```
+root@k8s-master-1:~/k8s-data/ingress# kubectl apply -f ingress-single-host.yaml
+Warning: networking.k8s.io/v1beta1 Ingress is deprecated in v1.19+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
+ingress.networking.k8s.io/ingress-tomcat-webapp created
+root@k8s-master-1:~/k8s-data/ingress# kubectl get ingress -n erp
+NAME                    CLASS    HOSTS               ADDRESS         PORTS   AGE
+ingress-tomcat-webapp   <none>   www.tomcatapp.com   192.168.0.192   80      2m17s
+```
+
+#### 6.3.3 修改负载均衡的配置
+
+修改配置:
+
+```
+root@k8s-haproxy-1:~# vim /etc/haproxy/haproxy.cfg 
+root@k8s-haproxy-1:~# cat /etc/haproxy/haproxy.cfg
+global
+	log /dev/log	local0
+	log /dev/log	local1 notice
+	chroot /var/lib/haproxy
+	stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
+	stats timeout 30s
+	user haproxy
+	group haproxy
+	daemon
+
+	# Default SSL material locations
+	ca-base /etc/ssl/certs
+	crt-base /etc/ssl/private
+
+	# Default ciphers to use on SSL-enabled listening sockets.
+	# For more information, see ciphers(1SSL). This list is from:
+	#  https://hynek.me/articles/hardening-your-web-servers-ssl-ciphers/
+	# An alternative list with additional directives can be obtained from
+	#  https://mozilla.github.io/server-side-tls/ssl-config-generator/?server=haproxy
+	ssl-default-bind-ciphers ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:RSA+AESGCM:RSA+AES:!aNULL:!MD5:!DSS
+	ssl-default-bind-options no-sslv3
+
+defaults
+	log	global
+	mode	http
+	option	httplog
+	option	dontlognull
+        timeout connect 5000
+        timeout client  50000
+        timeout server  50000
+	errorfile 400 /etc/haproxy/errors/400.http
+	errorfile 403 /etc/haproxy/errors/403.http
+	errorfile 408 /etc/haproxy/errors/408.http
+	errorfile 500 /etc/haproxy/errors/500.http
+	errorfile 502 /etc/haproxy/errors/502.http
+	errorfile 503 /etc/haproxy/errors/503.http
+	errorfile 504 /etc/haproxy/errors/504.http
+
+listen k8s-6443
+  # bind的地址即keepalived配置的IP地址
+  bind 192.168.0.118:6443
+  mode tcp
+  # server的IP地址即为kub-apiserver的节点地址 即本例中所有的k8s-master地址
+  server k8s-master-1 192.168.0.181:6443 check inter 3s fall 3 rise 5
+  server k8s-master-2 192.168.0.182:6443 check inter 3s fall 3 rise 5
+  server k8s-master-3 192.168.0.183:6443 check inter 3s fall 3 rise 5
+
+#listen erp-nginx-80
+#  bind 192.168.0.119:80
+#  mode tcp
+#  server k8s-node-1 192.168.0.191:30019 check inter 3s fall 3 rise 5
+#  server k8s-node-1 192.168.0.192:30019 check inter 3s fall 3 rise 5
+#  server k8s-node-1 192.168.0.193:30019 check inter 3s fall 3 rise 5
+
+
+#listen erp-nginx-80
+#  bind 192.168.0.119:80
+#  mode tcp
+#  server k8s-node-1 192.168.0.191:40002 check inter 3s fall 3 rise 5
+#  server k8s-node-1 192.168.0.192:40002 check inter 3s fall 3 rise 5
+#  server k8s-node-1 192.168.0.193:40002 check inter 3s fall 3 rise 5
+
+listen erp-tomcat-ingress-80
+  bind 192.168.0.120:80
+  mode tcp
+  server k8s-node-1 192.168.0.191:40080 check inter 3s fall 3 rise 5
+  server k8s-node-1 192.168.0.192:40080 check inter 3s fall 3 rise 5
+  server k8s-node-1 192.168.0.193:40080 check inter 3s fall 3 rise 5
+
+listen erp-tomcat-ingress-443
+  bind 192.168.0.120:443
+  mode tcp
+  server k8s-node-1 192.168.0.191:40444 check inter 3s fall 3 rise 5
+  server k8s-node-1 192.168.0.192:40444 check inter 3s fall 3 rise 5
+  server k8s-node-1 192.168.0.193:40444 check inter 3s fall 3 rise 5
+```
+
+重启服务:
+
+```
+root@k8s-haproxy-1:~# systemctl restart haproxy.service 
+```
+
+#### 6.3.4 配置本地域名解析
+
+注:此处修改的是本机(物理机)的域名解析
+
+```
+root@192 ~ % vim /etc/hosts
+root@192 ~ % cat /etc/hosts
+# Host Database
+#
+# localhost is used to configure the loopback interface
+# when the system is booting.  Do not change this entry.
+##
+127.0.0.1	localhost
+255.255.255.255	broadcasthost
+::1             localhost
+# Added by Docker Desktop
+# To allow the same kube context to work on the host and the container:
+127.0.0.1 kubernetes.docker.internal
+# End of section
+192.168.0.184 harbor.k8s.com
+192.168.0.119 www.mysite.com
+192.168.0.120 blogs.erp.net www.tomcatapp.com
+```
+
+#### 6.3.5 访问测试
+
+![ingress单域名访问测试](./img/ingress单域名访问测试.png)
+
+### 6.4 实现多个域名的Ingress
+
+#### 6.4.1 构建服务
+
+此处由于要实现多域名对多个service的转发规则,所以需要至少2个Service.此处除了使用刚刚的[`erp-tomcat-webapp-service`](https://github.com/rayallen20/K8SBaseStudy/blob/master/day8-kubernetes/day8-kubernetes.md#152-%E5%88%9B%E5%BB%BAservice)服务外,还使用之前构建的[`erp-nginx-webapp-service`](https://github.com/rayallen20/K8SBaseStudy/blob/master/day8-kubernetes/day8-kubernetes.md#132-%E5%88%9B%E5%BB%BAservice)
+
+#### 6.4.2 创建规则
+
+此处由于又使用了之前的`erp-tomcat-webapp-service`服务,所以需要先停止刚刚创建的单域名规则.
+
+```
+root@k8s-master-1:~/k8s-data/ingress# kubectl delete -f ingress-single-host.yaml 
+Warning: networking.k8s.io/v1beta1 Ingress is deprecated in v1.19+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
+ingress.networking.k8s.io "ingress-tomcat-webapp" deleted
+```
+
+```
+root@k8s-master-1:~/k8s-data/ingress# vim ingress-multi-host.yaml
+root@k8s-master-1:~/k8s-data/ingress# cat ingress-multi-host.yaml
+```
+
+```yaml
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-tomcat-nginx-webapp
+  namespace: erp
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/app-root: /myapp/app/index.html
+spec:
+  rules:
+    - host: www.tomcatapp.com
+      http:
+        paths:
+          - path:
+            backend:
+              serviceName: erp-tomcat-webapp-service
+              servicePort: 80
+
+    - host: mobile.tomcatapp.com
+      http:
+        paths:
+          - path:
+            backend:
+              serviceName: erp-nginx-webapp-service
+              servicePort: 80
+```
+
+```
+root@k8s-master-1:~/k8s-data/ingress# kubectl apply -f ingress-multi-host.yaml
+Warning: networking.k8s.io/v1beta1 Ingress is deprecated in v1.19+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
+ingress.networking.k8s.io/ingress-tomcat-nginx-webapp created
+```
+
+```
+root@k8s-master-1:~/k8s-data/ingress# kubectl get ingresses -n erp
+NAME                          CLASS    HOSTS                                    ADDRESS         PORTS   AGE
+ingress-tomcat-nginx-webapp   <none>   www.tomcatapp.com,mobile.tomcatapp.com   192.168.0.192   80      50s
+```
+
+#### 6.4.3 配置本地域名解析
+
+```
+root@192 ~ % vim /etc/hosts
+root@192 ~ % cat /etc/hosts
+# Host Database
+#
+# localhost is used to configure the loopback interface
+# when the system is booting.  Do not change this entry.
+##
+127.0.0.1	localhost
+255.255.255.255	broadcasthost
+::1             localhost
+# Added by Docker Desktop
+# To allow the same kube context to work on the host and the container:
+127.0.0.1 kubernetes.docker.internal
+# End of section
+192.168.0.184 harbor.k8s.com
+192.168.0.119 www.mysite.com
+192.168.0.120 blogs.erp.net www.tomcatapp.com mobile.tomcatapp.com
+```
+
+##### 6.4.5 测试访问
+
+![通过域名访问nginxService](./img/通过域名访问nginxService.png)
+
+![通过域名访问tomcatService](./img/通过域名访问tomcatService.png)
+
+### 6.5 实现基于URL请求流量转发的ingress
+
+实际上基于URL的请求流量转发,就类似于在nginx.conf中配置了多个location,每个location配置不同的proxy_pass,本质上是一样的.
+
+#### 6.5.1 创建规则
+
+同样,先删除之前的规则
+
+```
+root@k8s-master-1:~/k8s-data/ingress# kubectl delete -f ingress-multi-host.yaml 
+Warning: networking.k8s.io/v1beta1 Ingress is deprecated in v1.19+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
+ingress.networking.k8s.io "ingress-tomcat-nginx-webapp" deleted
+```
+
+```
+root@k8s-master-1:~/k8s-data/ingress# vim ingress-url.yaml
+root@k8s-master-1:~/k8s-data/ingress# cat ingress-url.yaml
+```
+
+```yaml
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-url-tomcat-nginx
+  namespace: erp
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/app-root: /myapp/app/index.html
+spec:
+  rules:
+    - host: www.tomcatapp.com
+      http:
+        paths:
+          # /myapp的URL 转发到tomcatService
+          - path: /myapp
+            backend:
+              serviceName: erp-tomcat-webapp-service
+              servicePort: 80
+          # /webapp的URL 转发到nginxService
+          - path: /webapp
+            backend:
+              serviceName: erp-nginx-webapp-service
+              servicePort: 80
+```
+
+```
+root@k8s-master-1:~/k8s-data/ingress# kubectl apply -f ingress-url.yaml 
+Warning: networking.k8s.io/v1beta1 Ingress is deprecated in v1.19+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
+ingress.networking.k8s.io/ingress-url-tomcat-nginx created
+root@k8s-master-1:~/k8s-data/ingress# kubectl get ingress -n erp
+NAME                       CLASS    HOSTS               ADDRESS   PORTS   AGE
+ingress-url-tomcat-nginx   <none>   www.tomcatapp.com             80      11s
+```
+
+#### 6.5.2 测试访问
+
+![通过匹配域名访问tomcatService](./img/通过匹配域名访问tomcatService.png)
+
+![通过匹配域名访问nginxService](./img/通过匹配域名访问nginxService.png)
+
+注:此时若访问`http://www.tomcatapp.com/webapp/index.html`则会报404,这是因为对于`erp-nginx-webapp-service`而言,在location下并没有`/webapp/index.html`这个文件
+
+制作一个index.html:
+
+```
+root@k8s-master-1:~/k8s-data/ingress# kubectl exec -it erp-nginx-webapp-deployment-65fb86d9f6-8mhhb bash -n erp
+[root@erp-nginx-webapp-deployment-65fb86d9f6-8mhhb /]# cd /usr/local/nginx/html/
+[root@erp-nginx-webapp-deployment-65fb86d9f6-8mhhb html]# ls
+50x.html  index.html  webapp
+[root@erp-nginx-webapp-deployment-65fb86d9f6-8mhhb html]# cd webapp/
+[root@erp-nginx-webapp-deployment-65fb86d9f6-8mhhb webapp]# ls
+images  static  webapp-index.html
+[root@erp-nginx-webapp-deployment-65fb86d9f6-8mhhb webapp]# vim index.html
+[root@erp-nginx-webapp-deployment-65fb86d9f6-8mhhb webapp]# 
+```
+
+![通过匹配域名访问nginxService的首页](./img/通过匹配域名访问nginxService的首页.png)
+
+
+注:若想实现多域名的多URL转发,则按照如下格式配置即可:
+
+```
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-url-tomcat-nginx
+  namespace: erp
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/app-root: /myapp/app/index.html
+spec:
+  rules:
+    - host: www.tomcatapp.com
+      http:
+        paths:
+          # /myapp的URL 转发到tomcatService
+          - path: /myapp
+            backend:
+              serviceName: erp-tomcat-webapp-service
+              servicePort: 80
+          # /webapp的URL 转发到nginxService
+          - path: /webapp
+            backend:
+              serviceName: erp-nginx-webapp-service
+              servicePort: 80
+
+    - host: mobile.tomcatapp.com
+      http:
+        paths:
+          # /myapp的URL 转发到tomcatService
+          - path: /myapp
+            backend:
+              serviceName: erp-tomcat-webapp-service
+              servicePort: 80
+          # /webapp的URL 转发到nginxService
+          - path: /webapp
+            backend:
+              serviceName: erp-nginx-webapp-service
+              servicePort: 80
+```
+
+### 6.6 实现单个https域名的ingress
+
+在K8S中实现HTTPS域名,通常不会把证书放在容器里边,而是放在容器外边.可以放在K8S之外的LB上,当然也可以放在运行nginx的Pod上,这个要看需求.
+
+#### 6.6.1 生成证书并配置K8S Secret
+
+生成ca证书:
+
+```
+root@k8s-master-1:~/k8s-data/ingress# mkdir certs
+root@k8s-master-1:~/k8s-data/ingress# cd certs/
+root@k8s-master-1:~/k8s-data/ingress/certs# openssl req -x509 -sha256 -newkey rsa:4096 -keyout ca.key -out ca.crt -days 3560 -nodes -subj '/CN=www.tomcatapp.com'
+Can't load /root/.rnd into RNG
+140103720653248:error:2406F079:random number generator:RAND_load_file:Cannot open file:../crypto/rand/randfile.c:88:Filename=/root/.rnd
+Generating a RSA private key
+............................................................................++++
+...............................++++
+writing new private key to 'ca.key'
+root@k8s-master-1:~/k8s-data/ingress/certs# ls
+ca.crt  ca.key
+```
+
+生成csl文件:
+
+```
+root@k8s-master-1:~/k8s-data/ingress/certs# openssl req -new -newkey rsa:4096 -keyout server.key -out server.csr -nodes -subj '/CN=www.tomcatapp.com'
+Can't load /root/.rnd into RNG
+140086245650880:error:2406F079:random number generator:RAND_load_file:Cannot open file:../crypto/rand/randfile.c:88:Filename=/root/.rnd
+Generating a RSA private key
+....................................++++
+...................................................................................................++++
+writing new private key to 'server.key'
+-----
+root@k8s-master-1:~/k8s-data/ingress/certs# ls
+ca.crt  ca.key  server.csr  server.key
+```
+
+将csr文件签发为crt证书:
+
+```
+root@k8s-master-1:~/k8s-data/ingress/certs# openssl x509 -req -sha256 -days 3650 -in server.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out server.crt
+Signature ok
+subject=CN = www.tomcatapp.com
+Getting CA Private Key
+root@k8s-master-1:~/k8s-data/ingress/certs# ls
+ca.crt  ca.key  server.crt  server.csr  server.key
+```
+
+其中公钥为`server.crt`,私钥为`server.key`
+
+在K8S中创建secret,用于保存密钥信息:
+
+```
+root@k8s-master-1:~/k8s-data/ingress/certs# kubectl  create secret generic nginx-tls-secret --from-file=tls.crt=server.crt --from-file=tls.key=server.key -n erp
+secret/tomcat-tls-secret created
+```
+
+其中:
+
+- `tomcat-tls-secret`:K8S中secret的名字
+- `tls.crt`:K8S中的secret以KV形式存储密钥信息.tls.crt表示key的名字,此处表示的是公钥的key
+- `server.crt`:公钥文件的文件名
+- `tls.key`:私钥的key
+- `server.key`:私钥文件的文件名
+
+查看secret:
+
+```
+root@k8s-master-1:~/k8s-data/ingress/certs# kubectl get secrets -n erp
+NAME                  TYPE                                  DATA   AGE
+default-token-td2cn   kubernetes.io/service-account-token   3      26d
+nginx-tls-secret     Opaque                                2      92s
+```
+
+#### 6.6.2 创建规则
+
+删除之前的规则:
+
+```
+root@k8s-master-1:~/k8s-data/ingress# kubectl delete -f ingress-url.yaml 
+Warning: networking.k8s.io/v1beta1 Ingress is deprecated in v1.19+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
+ingress.networking.k8s.io "ingress-url-tomcat-nginx" deleted
+```
+
+创建规则:
+
+```
+root@k8s-master-1:~/k8s-data/ingress/certs# cd ..
+root@k8s-master-1:~/k8s-data/ingress# vim ingress-https-single-host.yaml 
+root@k8s-master-1:~/k8s-data/ingress# cat ingress-https-single-host.yaml
+```
+
+```yaml
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-https
+  namespace: erp
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: 'true'
+    nginx.ingress.kubernetes.io/enable-access-log: "true"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+       access_log /var/log/nginx/tomcatapp.com.access.log upstreaminfo if=$loggable;
+       error_log  /var/log/nginx/tomcatapp.com.error.log;
+spec:
+  tls:
+  - hosts:
+    - www.tomcatapp.com
+    secretName: nginx-tls-secret
+  rules:
+  - host: www.tomcatapp.com
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: erp-nginx-webapp-service
+          servicePort: 80
+```
+
+```
+root@k8s-master-1:~/k8s-data/ingress# kubectl apply -f ingress-https-single-host.yaml 
+Warning: networking.k8s.io/v1beta1 Ingress is deprecated in v1.19+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
+ingress.networking.k8s.io/ingress-tomcat-nginx-webapp created
+root@k8s-master-1:~/k8s-data/ingress# kubectl get ingresses -n erp
+NAME            CLASS    HOSTS               ADDRESS         PORTS     AGE
+ingress-https   <none>   www.tomcatapp.com   192.168.0.193   80, 443   4m22s
+```
+
+![ingress单域名HTTPS访问](./img/ingress单域名HTTPS访问.png)
+
+### 6.7 实现多个https域名的ingress
+
+#### 6.7.1 生成证书并配置K8S Secret
+
+```
+root@k8s-master-1:~/k8s-data/ingress/certs# openssl req -new -newkey rsa:4096 -keyout mobile.key -out mobile.csr -nodes -subj '/CN=mobile.tomcatapp.com'
+Generating a RSA private key
+...............++++
+..........................++++
+writing new private key to 'mobile.key'
+-----
+root@k8s-master-1:~/k8s-data/ingress/certs# openssl x509 -req -sha256 -days 3650 -in mobile.csr -CA ca.crt -CAkey ca.key -set_serial 01  -out mobile.crt
+Signature ok
+subject=CN = mobile.tomcatapp.com
+Getting CA Private Key
+root@k8s-master-1:~/k8s-data/ingress/certs# kubectl  create secret generic mobile-tls-secret --from-file=tls.crt=mobile.crt --from-file=tls.key=mobile.key -n erp
+secret/mobile-tls-secret created
+```
+
+#### 6.7.2 创建规则
+
+删除之前的规则:
+
+```
+root@k8s-master-1:~/k8s-data/ingress# kubectl delete -f ingress-https-single-host.yaml 
+Warning: networking.k8s.io/v1beta1 Ingress is deprecated in v1.19+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
+ingress.networking.k8s.io "ingress-https" deleted
+```
+
+创建规则:
+
+```
+root@k8s-master-1:~/k8s-data/ingress# vim ingress-https-multi-host.yaml
+root@k8s-master-1:~/k8s-data/ingress# cat ingress-https-multi-host.yaml
+```
+
+```yaml
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-multi-https
+  namespace: erp
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: 'true'
+spec:
+  tls:
+  - hosts:
+    - www.tomcatapp.com
+    secretName: nginx-tls-secret
+  - hosts:
+    - mobile.tomcatapp.com
+    secretName: mobile-tls-secret
+  rules:
+  - host: www.tomcatapp.com
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: erp-nginx-webapp-service
+          servicePort: 80
+  - host: mobile.tomcatapp.com
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: erp-tomcat-webapp-service
+          servicePort: 80
+```
+
+```
+root@k8s-master-1:~/k8s-data/ingress# kubectl apply -f ingress-https-multi-host.yaml 
+Warning: networking.k8s.io/v1beta1 Ingress is deprecated in v1.19+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
+ingress.networking.k8s.io/ingress-multi-https created
+```
+
+![访问多域名HTTPS的nginxService](./img/访问多域名HTTPS的nginxService.png)
+
+![访问多域名HTTPS的tomcatService](./img/访问多域名HTTPS的tomcatService.png)
+
+## PART7. HPA
+
+kubectl autoscale⾃动控制在k8s集群中运⾏的pod数量(⽔平⾃动伸缩),**需要提前设置pod范围及触发条件**.
+K8S从1.1版本开始增加了名称为HPA(Horizontal Pod Autoscaler)的控制器,⽤于实现基于pod中资源
+(CPU/Memory)利⽤率进⾏对pod的⾃动扩缩容功能的实现,早期的版本只能基于Heapster组件实现对CPU利⽤率
+做为触发条件,但是在K8S 1.11版本开始使⽤Metrices Server完成数据采集,然后将采集到的数据通过
+API(Aggregated API,即汇总API.例如metrics.k8s.io、custom.metrics.k8s.io、external.metrics.k8s.io等然后再把数据提供给HPA控制器进⾏查询,以实现基于某个资源利⽤率对pod进⾏扩缩容的⽬的.
+
+![HPA](./img/HPA.png)
+
+查看K8S集群的资源利用率:
+
+- 查看node资源利用率:`kubectl top node`
+- 查看pod资源利用率:`kubectl top pod`
+
+需要安装Metrics API后才能使用.
+
+控制管理器默认每隔15s(可以通过`–horizontal-pod-autoscaler-sync-period`修改)查询metrics的资源使
+⽤情况.
+
+```
+root@k8s-master-1:~/k8s-data/ingress# kube-controller-manager --help | grep horizontal-pod-autoscaler-sync-period
+      --horizontal-pod-autoscaler-sync-period duration                 The period for syncing the number of pods in horizontal pod autoscaler. (default 15s)
+```
+
+⽀持以下三种metrics指标类型:
+
+- 预定义metrics(⽐如Pod的CPU)以利⽤率的⽅式计算
+- ⾃定义的Pod metrics,以原始值(raw value)的⽅式计算
+- ⾃定义的object metrics
+
+⽀持两种metrics查询⽅式:
+
+- Heapster(已废弃)
+- ⾃定义的REST API
+
+
+⽀持多metrics
+
+### 7.1 部署metrics-server
+
+#### 7.1.1 构建metrics-server镜像
+
+使⽤[metrics-server](https://github.com/kubernetes-sigs/metrics-server)作为HPA数据源.推荐使用0.4.X版本的metrics-server.
+
+```
+root@ks8-harbor-2:~# docker pull registry.cn-hangzhou.aliyuncs.com/google_containers/metrics-server:v0.4.4
+v0.4.4: Pulling from google_containers/metrics-server
+5dea5ec2316d: Pull complete 
+4aa3a7cd5702: Pull complete 
+Digest: sha256:f8643f007c8a604388eadbdac43d76b95b56ccd13f7447dd0934b594b9f7b363
+Status: Downloaded newer image for registry.cn-hangzhou.aliyuncs.com/google_containers/metrics-server:v0.4.4
+registry.cn-hangzhou.aliyuncs.com/google_containers/metrics-server:v0.4.4
+root@ks8-harbor-2:~# docker tag registry.cn-hangzhou.aliyuncs.com/google_containers/metrics-server:v0.4.4 harbor.k8s.com/hpa-images/metrics-server:v0.4.4
+root@ks8-harbor-2:~# docker push harbor.k8s.com/hpa-images/metrics-server:v0.4.4
+The push refers to repository [harbor.k8s.com/hpa-images/metrics-server]
+f7ddbfcf39e1: Pushed 
+417cb9b79ade: Pushed 
+v0.4.4: digest: sha256:e6ec40715308dac19766bdfcecba651f73adbc527e1ac8abddcc3a52547b95d6 size: 739
+```
+
+#### 7.1.2 创建metrics-server Pod
+
+[v0.4.4版本yaml文件地址](https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.4.4/components.yaml)
+
+```
+root@k8s-master-1:~/k8s-data/ingress# cd ..
+root@k8s-master-1:~/k8s-data# mkdir hpa
+root@k8s-master-1:~/k8s-data# cd hpa
+root@k8s-master-1:~/k8s-data/hpa# vim components-v0.4.4.yaml
+root@k8s-master-1:~/k8s-data/hpa# cat components-v0.4.4.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    k8s-app: metrics-server
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+  name: system:aggregated-metrics-reader
+rules:
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - pods
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: system:metrics-server
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - nodes
+  - nodes/stats
+  - namespaces
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server-auth-reader
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+- kind: ServiceAccount
+  name: metrics-server
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server:system:auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+- kind: ServiceAccount
+  name: metrics-server
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: system:metrics-server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:metrics-server
+subjects:
+- kind: ServiceAccount
+  name: metrics-server
+  namespace: kube-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server
+  namespace: kube-system
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: https
+  selector:
+    k8s-app: metrics-server
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      k8s-app: metrics-server
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        k8s-app: metrics-server
+    spec:
+      containers:
+      - args:
+        - --cert-dir=/tmp
+        - --secure-port=4443
+        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+        - --kubelet-use-node-status-port
+        image: harbor.k8s.com/hpa-images/metrics-server:v0.4.4
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /livez
+            port: https
+            scheme: HTTPS
+          periodSeconds: 10
+        name: metrics-server
+        ports:
+        - containerPort: 4443
+          name: https
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /readyz
+            port: https
+            scheme: HTTPS
+          periodSeconds: 10
+        securityContext:
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp-dir
+      nodeSelector:
+        kubernetes.io/os: linux
+      priorityClassName: system-cluster-critical
+      serviceAccountName: metrics-server
+      volumes:
+      - emptyDir: {}
+        name: tmp-dir
+---
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: v1beta1.metrics.k8s.io
+spec:
+  group: metrics.k8s.io
+  groupPriorityMinimum: 100
+  insecureSkipTLSVerify: true
+  service:
+    name: metrics-server
+    namespace: kube-system
+  version: v1beta1
+  versionPriority: 100
+```
+
+```
+root@k8s-master-1:~/k8s-data/hpa# kubectl apply -f components-v0.4.4.yaml
+serviceaccount/metrics-server created
+clusterrole.rbac.authorization.k8s.io/system:aggregated-metrics-reader created
+clusterrole.rbac.authorization.k8s.io/system:metrics-server created
+rolebinding.rbac.authorization.k8s.io/metrics-server-auth-reader created
+clusterrolebinding.rbac.authorization.k8s.io/metrics-server:system:auth-delegator created
+clusterrolebinding.rbac.authorization.k8s.io/system:metrics-server created
+service/metrics-server created
+deployment.apps/metrics-server created
+apiservice.apiregistration.k8s.io/v1beta1.metrics.k8s.io created
+root@k8s-master-1:~/k8s-data/hpa# kubectl get pod -n kube-system
+NAME                                       READY   STATUS    RESTARTS   AGE
+calico-kube-controllers-75b57c64c6-kw5b6   1/1     Running   0          7h33m
+calico-node-4q6dp                          1/1     Running   2          29d
+calico-node-5dmf4                          1/1     Running   13         29d
+calico-node-6nsdd                          1/1     Running   12         29d
+calico-node-8qsb6                          1/1     Running   2          29d
+calico-node-jc4j6                          1/1     Running   4          29d
+calico-node-lks6l                          1/1     Running   13         29d
+coredns-5b86cf85-7nwl5                     1/1     Running   0          7h33m
+fluentd-elasticsearch-5tws5                1/1     Running   2          29d
+fluentd-elasticsearch-cvvm7                1/1     Running   2          29d
+fluentd-elasticsearch-jzd59                1/1     Running   11         29d
+fluentd-elasticsearch-lqrt7                1/1     Running   12         29d
+fluentd-elasticsearch-mddg9                1/1     Running   2          29d
+fluentd-elasticsearch-tq9l4                1/1     Running   12         29d
+metrics-server-98bccff87-dh7mt             1/1     Running   0          7s
+```
+
+此处要求`metrics-server`必须是能起来的.
+
+此时就可以使用`kubectl top`命令查看资源利用率了:
+
+```
+root@k8s-master-1:~/k8s-data/hpa# kubectl top node
+W0523 21:14:27.943196   30635 top_node.go:119] Using json format to get metrics. Next release will switch to protocol-buffers, switch early by passing --use-protocol-buffers flag
+NAME            CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%   
+192.168.0.181   101m         5%     1245Mi          98%       
+192.168.0.182   103m         5%     1306Mi          102%      
+192.168.0.183   123m         6%     1300Mi          102%      
+192.168.0.191   94m          4%     755Mi           23%       
+192.168.0.192   139m         6%     718Mi           22%       
+192.168.0.193   185m         9%     2099Mi          65%  
+```
+
+```
+root@k8s-master-1:~/k8s-data/hpa# kubectl top pod -n erp
+W0523 21:15:20.001391   31472 top_pod.go:140] Using json format to get metrics. Next release will switch to protocol-buffers, switch early by passing --use-protocol-buffers flag
+NAME                                            CPU(cores)   MEMORY(bytes)   
+dubbo-admin-deploy-697654f7d9-ssnnp             3m           276Mi           
+erp-consumer-deployment-79d5876d79-tzk6x        0m           6Mi             
+erp-jenkins-deployment-696696cb65-84nts         1m           529Mi           
+erp-nginx-webapp-deployment-65fb86d9f6-x9vwv    0m           5Mi             
+erp-provider-deployment-747df899c4-xcf7w        10m          9Mi             
+erp-tomcat-webapp-deployment-84bbf6b865-6rpj7   2m           166Mi           
+mysql-0                                         6m           206Mi           
+mysql-1                                         6m           206Mi           
+mysql-2                                         7m           205Mi           
+redis-deployment-6d85975b47-8bw4p               1m           3Mi             
+wordpress-app-deployment-7fcb55bd59-s79d6       1m           16Mi            
+zookeeper1-7ff6fbfbf-4frpw                      1m           70Mi            
+zookeeper2-94cfd4596-8ztxj                      1m           60Mi            
+zookeeper3-7f55657779-ssbxf                     1m           58Mi   
+```
+
+且dashboard中也会显示每个pod的资源利用率:
+
+![配置metric-server后的dashboard](./img/配置metric-server后的dashboard.png)
+
+### 7.2 配置扩缩容
+
+#### 7.2.1 通过命令行配置扩缩容
+
+这种方式很少使用,了解即可.通常测试用,生产环境不会允许这么创建HPA的.
+
+```
+root@k8s-master-1:~/k8s-data/hpa# kubectl autoscale deployment erp-tomcat-webapp-deployment --min=2 --max=10 --cpu-percent=80 -n erp
+horizontalpodautoscaler.autoscaling/erp-tomcat-webapp-deployment autoscaled
+root@k8s-master-1:~/k8s-data/hpa# kubectl get hpa -n erp
+NAME                           REFERENCE                                 TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+erp-tomcat-webapp-deployment   Deployment/erp-tomcat-webapp-deployment   0%/80%    2         10        2          43s
+```
+
+其中:
+
+- `--min=2`:最小副本数
+- `--max=10`:最大副本数
+- `--cpu-percent=80`:扩缩容条件
+
+注:注意TARGETS列,值必须不能为UNKNOWN.若为UNKNOWN则说明HPA未能成功采集到数据.
+
+注:测试完成后记得删除这个HPA
+
+不设置条件,直接手动控制副本数:
+
+```
+kubectl scale deployment erp-tomcat-webapp-deployment --replicas=2 -n erp
+```
+
+#### 7.2.2 通过yaml文件配置扩缩容
+
+通常HPA是和Service、Deployment的yaml文件是放在一起的.
+
+```
+root@k8s-master-1:~/k8s-data/hpa# cd ..
+root@k8s-master-1:~/k8s-data# cd tomcat-webapp-yaml/
+root@k8s-master-1:~/k8s-data/tomcat-webapp-yaml# vim tomcat-webapp-hpa.yaml
+root@k8s-master-1:~/k8s-data/tomcat-webapp-yaml# cat tomcat-webapp-hpa.yaml
+```
+
+```yaml
+apiVersion: autoscaling/v1 
+kind: HorizontalPodAutoscaler
+metadata:
+  # HPA要和它所管理的资源处于同一个namespace下
+  namespace: erp
+  name: erp-tomcat-webapp-podautoscaler
+  labels:
+    app: erp-tomcat-webapp-podautoscaler
+    version: v2beta1
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    # 指定HPA要管理的资源类型
+    kind: Deployment
+    # 指定HPA要管理的资源名称
+    name: erp-tomcat-webapp-deployment
+  # 最小副本数  
+  minReplicas: 2
+  # 最大副本数
+  maxReplicas: 20
+  # 扩缩容条件 不支持对内存设置扩缩容条件
+  targetCPUUtilizationPercentage: 60
+  # 早期(apiVersion为autoscaling/v2beta1)的写法如下
+  #metrics:
+  #- type: Resource
+  #  resource:
+  #    name: cpu
+  #    targetAverageUtilization: 60
+  #- type: Resource
+  #  resource:
+  #    name: memory
+```
+
+创建HPA前,查看Pod的副本数:
+
+```
+root@k8s-master-1:~/k8s-data/tomcat-webapp-yaml# kubectl get pod -n erp
+NAME                                            READY   STATUS    RESTARTS   AGE
+dubbo-admin-deploy-697654f7d9-ssnnp             1/1     Running   0          8h
+erp-consumer-deployment-79d5876d79-tzk6x        1/1     Running   0          8h
+erp-jenkins-deployment-696696cb65-84nts         1/1     Running   0          8h
+erp-nginx-webapp-deployment-65fb86d9f6-x9vwv    1/1     Running   0          8h
+erp-provider-deployment-747df899c4-xcf7w        1/1     Running   0          8h
+erp-tomcat-webapp-deployment-84bbf6b865-6rpj7   1/1     Running   0          8h
+mysql-0                                         2/2     Running   0          7h31m
+mysql-1                                         2/2     Running   0          7h30m
+mysql-2                                         2/2     Running   0          7h30m
+redis-deployment-6d85975b47-8bw4p               1/1     Running   0          8h
+wordpress-app-deployment-7fcb55bd59-s79d6       2/2     Running   0          8h
+zookeeper1-7ff6fbfbf-4frpw                      1/1     Running   0          8h
+zookeeper2-94cfd4596-8ztxj                      1/1     Running   0          8h
+zookeeper3-7f55657779-ssbxf                     1/1     Running   0          8h
+```
+
+可以看到,Pod只有1个副本.
+
+创建HPA:
+
+```
+root@k8s-master-1:~/k8s-data/tomcat-webapp-yaml# kubectl apply -f tomcat-webapp-hpa.yaml 
+horizontalpodautoscaler.autoscaling/erp-tomcat-webapp-podautoscaler created
+NAME                              REFERENCE                                 TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+erp-tomcat-webapp-podautoscaler   Deployment/erp-tomcat-webapp-deployment   0%/60%    2         20        2          23s
+```
+
+查看HPA:
+
+```
+root@k8s-master-1:~/k8s-data/tomcat-webapp-yaml# kubectl describe hpa erp-tomcat-webapp-podautoscaler -n erp
+Name:                                                  erp-tomcat-webapp-podautoscaler
+Namespace:                                             erp
+Labels:                                                app=erp-tomcat-webapp-podautoscaler
+                                                       version=v2beta1
+Annotations:                                           <none>
+CreationTimestamp:                                     Mon, 23 May 2022 21:43:28 +0800
+Reference:                                             Deployment/erp-tomcat-webapp-deployment
+Metrics:                                               ( current / target )
+  resource cpu on pods  (as a percentage of request):  0% (2m) / 60%
+Min replicas:                                          2
+Max replicas:                                          20
+Deployment pods:                                       2 current / 2 desired
+Conditions:
+  Type            Status  Reason               Message
+  ----            ------  ------               -------
+  AbleToScale     True    ScaleDownStabilized  recent recommendations were higher than current one, applying the highest recent recommendation
+  ScalingActive   True    ValidMetricFound     the HPA was able to successfully calculate a replica count from cpu resource utilization (percentage of request)
+  ScalingLimited  True    TooFewReplicas       the desired replica count is less than the minimum replica count
+Events:
+  Type    Reason             Age   From                       Message
+  ----    ------             ----  ----                       -------
+  Normal  SuccessfulRescale  47s   horizontal-pod-autoscaler  New size: 2; reason: Current number of replicas below Spec.MinReplicas
+```
+
+可以看到,47秒前,HPA又创建了一个Pod.
+
+查看Pod:
+
+```
+root@k8s-master-1:~/k8s-data/tomcat-webapp-yaml# kubectl get pod -n erp
+NAME                                            READY   STATUS    RESTARTS   AGE
+dubbo-admin-deploy-697654f7d9-ssnnp             1/1     Running   0          8h
+erp-consumer-deployment-79d5876d79-tzk6x        1/1     Running   0          8h
+erp-jenkins-deployment-696696cb65-84nts         1/1     Running   0          8h
+erp-nginx-webapp-deployment-65fb86d9f6-x9vwv    1/1     Running   0          8h
+erp-provider-deployment-747df899c4-xcf7w        1/1     Running   0          8h
+erp-tomcat-webapp-deployment-84bbf6b865-6rpj7   1/1     Running   0          8h
+erp-tomcat-webapp-deployment-84bbf6b865-nh2t9   1/1     Running   0          87s
+mysql-0                                         2/2     Running   0          7h35m
+mysql-1                                         2/2     Running   0          7h35m
+mysql-2                                         2/2     Running   0          7h35m
+redis-deployment-6d85975b47-8bw4p               1/1     Running   0          8h
+wordpress-app-deployment-7fcb55bd59-s79d6       2/2     Running   0          8h
+zookeeper1-7ff6fbfbf-4frpw                      1/1     Running   0          8h
+zookeeper2-94cfd4596-8ztxj                      1/1     Running   0          8h
+zookeeper3-7f55657779-ssbxf                     1/1     Running   0          8h
+```
+
+确认又创建了一个新的Pod.
+
+实际上执行伸缩是HPA调用Deployment实现的.

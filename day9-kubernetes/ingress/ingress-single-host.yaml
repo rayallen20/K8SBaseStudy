@@ -1,0 +1,39 @@
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-tomcat-webapp
+  # ingress必须和要代理的service处于同一个namespace下
+  namespace: erp
+  annotations:
+    # 指定Ingress Controller的类型
+    kubernetes.io/ingress.class: "nginx"
+    # SSL重定向 即:将http请求强制重定向为https请求
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # 指定rules定义的path可以使用正则表达式
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    # 连接超时时间 单位:秒 默认为5s
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    # 后端服务器回转数据的超时时间 单位:秒 默认为60s
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    # 后端服务器响应超时时间 单位:秒 默认为60s
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    # 客户端上传文件最大大小 默认为20m
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    # URL重写
+    # nginx.ingress.kubernetes.io/rewrite-target: /
+    # 若用户请求的URL不存在 跳到哪个URL
+    nginx.ingress.kubernetes.io/app-root: /myapp/app/index.html
+spec:
+  # 路由规则
+  rules:
+    # 客户端访问的host域名
+    - host: www.tomcatapp.com
+      http:
+        paths:
+          # path没有指定 则表示整个域名的转发规则
+          - path:
+            backend:
+              # 指定转发的service
+              serviceName: erp-tomcat-webapp-service
+              # 转发的service的端口号
+              servicePort: 80

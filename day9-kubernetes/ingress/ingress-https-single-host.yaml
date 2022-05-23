@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-https
+  namespace: erp
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: 'true'
+    nginx.ingress.kubernetes.io/enable-access-log: "true"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+       access_log /var/log/nginx/tomcatapp.com.access.log upstreaminfo if=$loggable;
+       error_log  /var/log/nginx/tomcatapp.com.error.log;
+spec:
+  tls:
+  - hosts:
+    - www.tomcatapp.com
+    secretName: nginx-tls-secret
+  rules:
+  - host: www.tomcatapp.com
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: erp-nginx-webapp-service
+          servicePort: 80

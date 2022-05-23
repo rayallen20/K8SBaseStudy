@@ -1,0 +1,25 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: erp-provider
+  name: erp-provider-deployment
+  namespace: erp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: erp-provider
+  template:
+    metadata:
+      labels:
+        app: erp-provider
+    spec:
+      containers:
+      - name: erp-provider-container
+        image: harbor.k8s.com/erp/dubbo-demo-provider:v1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 20880
+          protocol: TCP
+          name: http

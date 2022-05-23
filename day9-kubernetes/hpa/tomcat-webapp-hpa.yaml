@@ -1,0 +1,31 @@
+apiVersion: autoscaling/v1 
+kind: HorizontalPodAutoscaler
+metadata:
+  # HPA要和它所管理的资源处于同一个namespace下
+  namespace: erp
+  name: erp-tomcat-webapp-podautoscaler
+  labels:
+    app: erp-tomcat-webapp-podautoscaler
+    version: v2beta1
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    # 指定HPA要管理的资源类型
+    kind: Deployment
+    # 指定HPA要管理的资源名称
+    name: erp-tomcat-webapp-deployment
+  # 最小副本数  
+  minReplicas: 2
+  # 最大副本数
+  maxReplicas: 20
+  # 扩缩容条件 不支持对内存设置扩缩容条件
+  targetCPUUtilizationPercentage: 60
+  # 早期(apiVersion为autoscaling/v2beta1)的写法如下
+  #metrics:
+  #- type: Resource
+  #  resource:
+  #    name: cpu
+  #    targetAverageUtilization: 60
+  #- type: Resource
+  #  resource:
+  #    name: memory

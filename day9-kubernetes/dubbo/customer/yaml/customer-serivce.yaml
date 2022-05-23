@@ -1,0 +1,16 @@
+kind: Service
+apiVersion: v1
+metadata:
+  labels:
+    app: erp-consumer
+  name: erp-consumer-service
+  namespace: erp
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: erp-consumer

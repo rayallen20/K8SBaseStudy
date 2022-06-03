@@ -1,0 +1,27 @@
+kind: Service
+apiVersion: v1
+metadata:
+  labels:
+    app: erp-gray-released-service-label
+  name: erp-gray-released-service
+  namespace: erp
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 80
+      nodePort: 40042
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: 443
+      nodePort: 41443
+  selector:
+    # 注意:此处并没有写version标签,只写了app标签
+    # 选择器在多个标签之间的关系是逻辑且 因为后续还要通过该service
+    # 访问v2版本的pod 所以如果此处再写一个version标签 则通过该service
+    # 就只能访问到v1版本的pod了
+    app: erp-gray-released-app
+    version: v2

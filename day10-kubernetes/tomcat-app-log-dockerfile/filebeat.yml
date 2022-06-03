@@ -1,0 +1,30 @@
+filebeat.inputs:
+# catalina启动日志
+- type: log
+  enabled: true
+  # 要获取的日志路径
+  paths:
+    - /apps/tomcat/logs/catalina.out
+  # 用于区分不同日志的字段
+  fields:
+    type: tomcat-catalina
+- type: log
+  enabled: true
+  paths:
+    - /apps/tomcat/logs/localhost_access_log.*.txt
+  fields:
+    type: tomcat-accesslog
+setup.template.settings:
+  index.number_of_shards: 1
+output.kafka:
+  hosts: ["192.168.0.201:9092", "192.168.0.202:9092", "192.168.0.203:9092"]
+  # 1个topic中存了访问日志和错误日志2种日志
+  topic: "erp-tomcat-app"
+  # 写入时是否开启轮询
+  partition.round_robin:
+    reachable_only: false
+  # 是否等待应答
+  required_acks: 1
+  # 可以节省带宽 但是会消耗CPU资源
+  compression: gzip
+  max_message_bytes: 1000000

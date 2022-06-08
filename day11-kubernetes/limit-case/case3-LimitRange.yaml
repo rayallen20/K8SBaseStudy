@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: limit-range-erp
+  namespace: erp
+spec:
+  limits:
+    # 限制的资源类型为容器
+    - type: Container
+      # 限制容器的资源上限
+      max:
+        # 限制单个容器的最大CPU
+        cpu: "2"
+        # 限制单个容器的最大内存
+        memory: "2Gi"
+      # 限制资源下限
+      min:
+        # 限制单个容器的最小CPU
+        cpu: "500m"
+        # 限制单个容器的最小内存
+        memory: "512Mi"
+      # 默认单个容器的资源
+      default:
+        # 默认单个容器的CPU
+        cpu: "500m"
+        # 默认单个容器的内存
+        memory: "512Mi"
+      # 默认单个容器能够参与调度的节点资源要求
+      defaultRequest:
+        # 单个容器对参与调度的节点的CPU要求
+        cpu: "500m"
+        # 单个容器对参与调度的节点的内存要求
+        memory: "512Mi"
+      # 限制limit/requests的最大比值
+      # 为了避免能够参与调度的节点资源不足以运行容器
+      # 所以通常这个比值设置的不会太高
+      maxLimitRequestRatio:
+        # 限制CPU的 limit/requests的最大比值
+        cpu: 2
+        # 限制内存的 limit/requests的最大比值
+        memory: 2
+    # 限制的资源类型为Pod
+    - type: Pod
+      # 限制Pod的资源上限
+      max:
+        # 限制单个Pod的最大CPU
+        cpu: "4"
+        # 限制单个Pod的最大内存
+        memory: "4Gi"
+    # 限制的资源类型为PVC
+    - type: PersistentVolumeClaim
+      # 限制PVC的资源上限
+      max:
+        # 限制PVC的可申请存储空间上限
+        storage: 50Gi
+      # 限制PVC的资源下限
+      min:
+        # 限制PVC的可申请存储空间下限
+        storage: 1Gi

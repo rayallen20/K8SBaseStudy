@@ -1,0 +1,17 @@
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  # RoleBinding对象的名称
+  name: erp-user1-role-bind
+  namespace: erp
+subjects:
+  # 绑定到ServiceAccount对象
+  # 该字段值可以为 User Group ServiceAccount
+- kind: ServiceAccount
+  name: erp-user1
+  namespace: erp
+roleRef:
+  kind: Role
+  # Role对象的名称
+  name: erp-user1-role
+  apiGroup: rbac.authorization.k8s.io

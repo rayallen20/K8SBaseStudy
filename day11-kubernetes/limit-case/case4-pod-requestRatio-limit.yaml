@@ -1,0 +1,47 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: erp-wordpress-deployment-label
+  name: erp-wordpress-deployment
+  namespace: erp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: erp-wordpress-selector
+  template:
+    metadata:
+      labels:
+        app: erp-wordpress-selector
+    spec:
+      containers:
+      - name: erp-wordpress-nginx-container
+        image: harbor.k8s.com/erp/nginx:1.16.1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          protocol: TCP
+          name: http
+        resources:
+          limits:
+            cpu: 1
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 512Mi
+
+      - name: erp-wordpress-php-container
+        image: harbor.k8s.com/pub-images/php:5.6-fpm-alpine
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          protocol: TCP
+          name: http
+        resources:
+          limits:
+            cpu: 1
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 512Mi

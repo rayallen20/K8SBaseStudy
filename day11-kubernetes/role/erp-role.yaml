@@ -1,0 +1,47 @@
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: erp
+  # 后续通过Role对象的名称 绑定到对应账号
+  name: erp-user1-role
+rules:
+  # 表示对要设定权限的资源对象的API版本要求
+  # 例如:要对一个ingress做权限控制
+  # 通过kubectl api-resources命令查看资源的版本
+  # (即kubectl api-resources命令中的APIVERSION列)
+  # 可知 ingress资源对象有2个版本的API:
+  # extensions/v1beta1 和 networking.k8s.io/v1 
+  # 此处写*则表示2种API组都可以
+  # 若写""(空串)则表示使用core API group
+- apiGroups: ["*"]
+  # resources用于指定资源 即kubectl api-resources命令中的NAME列
+  # 像如下形式的资源 指的是子资源 例如要控制对Pod日志的权限 则此处要写"pods/log"
+  # 此处的"pods/exec"是一种用于在pod中执行命令的资源
+  resources: ["pods/exec"]
+  # 具体的权限 
+  # get: 查看单个
+  # list: 列出所有 
+  # watch: 监控 
+  # create: 创建
+  # update: 更新
+  # patch: 局部更新
+  # delete: 删除单个
+  # deletecollection: 删除集合
+  # exec: 执行
+  # proxy: 代理(不知道啥权限)
+  # redirect: 重定向(不知道啥权限)
+  verbs: ["get", "list", "watch", "create"]
+
+- apiGroups: ["*"]
+  resources: ["pods/log"]
+  verbs: ["get", "watch", "list"]
+
+- apiGroups: ["*"]
+  resources: ["pods"]
+  # 通常针对开发而言 给get list watch这3个权限就够了
+  verbs: ["get", "list", "watch"]
+
+  # 此处写apps/v1是因为deployment资源对象只有这么一个版本
+- apiGroups: ["apps/v1"]
+  resources: ["deployments"]
+  verbs: ["get", "watch", "list"]

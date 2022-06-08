@@ -1,0 +1,32 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: erp-cpu-limit-deployment-label
+  name: erp-cpu-limit-deployment
+  namespace: erp
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: erp-cpu-limit-deployment-selector
+  template:
+    metadata:
+      labels:
+        app: erp-cpu-limit-deployment-selector
+    spec:
+      containers:
+      - name: erp-nginx-container
+        image: harbor.k8s.com/erp/nginx:1.22.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          protocol: TCP
+          name: http
+        resources:
+          limits:
+            cpu: 1
+            memory: 1Gi
+          requests:
+            cpu: 1
+            memory: 512Mi

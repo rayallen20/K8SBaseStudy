@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: quota-erp
+  namespace: erp
+spec:
+  # 硬限制
+  hard:
+    # 该namespace下所有处于running状态的Pod 其CPU需求总量不能超过该值
+    requests.cpu: "20"
+    # 该namespace下所有处于running状态的Pod 其CPU限额总量不能超过该值
+    limits.cpu: "20"
+    # 该namespace下所有处于running状态的Pod 其内存需求总量不能超过该值
+    requests.memory: 100Gi
+    # 该namespace下所有处于running状态的Pod 其内存限额总量不能超过该值
+    limits.memory: 100Gi
+    # 该namespace下所有处于running状态的Pod 其扩展资源的配额不能超过该值
+    # 由于扩展资源无法超量分配 故没有必要在配额中对同一扩展资源指定requests和limits
+    requests.nvidia.com/gpu: 4
+    # 该namespace下所有PVC 其存储资源的需求总量不能超过该值
+    requests.storage: 200Gi
+    # 该namespace下 PVC的数量不能超过该值
+    persistentvolumeclaims: "100"
+    # 该namespace下 Pod的数量不能超过该值
+    pods: "100"
+    # 该namespace下 Service的数量不能超过该值
+    services: "100"

@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: limit-test-deployment
+  namespace: erp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: limit-test-pod
+  template:
+    metadata:
+      labels:
+        app: limit-test-pod
+    spec:
+      containers:
+      - name: limit-test-container
+        image: harbor.k8s.com/limit-case/docker-stress-ng:v1
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "1.2"
+          requests:
+            memory: "100Mi"
+            cpu: "200m"
+        args: ["--vm", "2", "--vm-bytes", "256M"]

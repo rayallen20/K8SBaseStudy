@@ -1393,7 +1393,7 @@ root@k8s-master-1:~/k8s-data/limit-case# vim case6-resourceQuota-erp.yaml
 root@k8s-master-1:~/k8s-data/limit-case# cat case6-resourceQuota-erp.yaml
 ```
 
-```json
+```yaml
 apiVersion: v1
 kind: ResourceQuota
 metadata:

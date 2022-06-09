@@ -3307,3 +3307,118 @@ traceroute to 172.31.6.207 (172.31.6.207), 30 hops max, 46 byte packets
  1 10.10.3.1 (10.10.3.1) 0.003 ms 0.004 ms 0.001 ms
  2 172.31.6.207 (172.31.6.207) 1.290 ms 0.776 ms 2.041 ms
 ```
+
+### 6.2 Calico
+
+[官网](https://www.tigera.io/project-calico/)
+
+Calico是⼀个纯三层的⽹络解决⽅案,为容器提供多node间的访问通信,calico将每⼀个node节点都当做⼀个路由器(router),各节点通过BGP(Border Gateway Protocol,边界⽹关协议)学习并在node节点⽣成路由规则,从⽽将不同node节点上的pod连接起来进⾏通信.
+
+BGP是⼀个去中⼼化的协议,它通过⾃动学习和维护路由表实现⽹络的可⽤性,但是并不是所有的⽹络都⽀持BGP,另外为了跨⽹络实现更⼤规模的⽹络管理,calico还⽀持IP-in-IP的叠加模型,简称IPIP,IPIP可以实现跨不同⽹段建⽴路由通信,但是会存在安全性问题.其在内核内置,可以通过Calico的配置⽂件设置是否启⽤IPIP,在公司内部如果k8s的node节点没有跨越⽹段建议关闭IPIP.
+
+IPIP是⼀种将各Node的路由之间做⼀个tunnel,再把两个⽹络连接起来的模式.启⽤IPIP模式时,Calico将在各Node上创建⼀个名为"tunl0"的虚拟⽹络接⼝.
+
+BGP模式则直接使⽤物理机作为虚拟路由路(vRouter),不再创建额外的tunnel.
+
+Calico核心组件:
+
+- Felix:calico的agent,运⾏在每⼀台node节点上,其主要是维护路由规则、汇报当前节点状态以确保pod的跨主机通信
+- BGP Client:每台node都运⾏,其主要负责监听node节点上由felix⽣成的路由信息,然后通过BGP协议⼴播⾄其他剩余的node节点,从⽽相互学习路由实现pod通信
+- Route Reflector:集中式的路由反射器,calico v3.3开始⽀持,当Calico BGP客户端将路由从其FIB(Forward Information dataBase,转发信息库)通告到Route Reflector时,Route Reflector会将这些路由通告给部署集群中的其他节点,Route Reflector专⻔⽤于管理BGP⽹络路由规则,不会产⽣pod数据通信
+
+注:calico默认⼯作模式是BGP的node-to-node mesh,如果要使⽤Route Reflector需要进⾏相关配置
+
+[Calico各组件结构](https://projectcalico.docs.tigera.io/reference/architecture/overview)
+
+[Calico网络配置](https://projectcalico.docs.tigera.io/networking/configuring)
+
+![calico架构](./img/calico架构.png)
+
+#### 6.2.1 部署过程
+
+[部署过程](https://projectcalico.docs.tigera.io/getting-started/kubernetes/)
+
+#### 6.2.2 验证当前路由表
+
+calico 2.x版本默认使⽤etcd v2 API;calico 3.x版本默认使⽤ etcd v3 API
+
+```
+root@k8s-node-1:~# calicoctl node status
+Calico process is running.
+
+IPv4 BGP status
++---------------+-------------------+-------+----------+-------------+
+| PEER ADDRESS  |     PEER TYPE     | STATE |  SINCE   |    INFO     |
++---------------+-------------------+-------+----------+-------------+
+| 192.168.0.181 | node-to-node mesh | up    | 02:14:50 | Established |
+| 192.168.0.182 | node-to-node mesh | up    | 02:14:50 | Established |
+| 192.168.0.183 | node-to-node mesh | up    | 02:14:50 | Established |
+| 192.168.0.192 | node-to-node mesh | up    | 02:14:49 | Established |
+| 192.168.0.193 | node-to-node mesh | up    | 02:14:49 | Established |
++---------------+-------------------+-------+----------+-------------+
+
+IPv6 BGP status
+No IPv6 peers found.
+```
+
+#### 6.2.3 查看pod路由走向
+
+##### 6.2.3.1 开启IPIP的通信状态
+
+```
+root@k8s-node-1:~# route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         192.168.0.1     0.0.0.0         UG    0      0        0 eth0
+10.200.76.128   192.168.0.193   255.255.255.192 UG    0      0        0 tunl0
+10.200.109.64   0.0.0.0         255.255.255.192 U     0      0        0 *
+10.200.109.66   0.0.0.0         255.255.255.255 UH    0      0        0 cali4aa6b2a4444
+10.200.109.68   0.0.0.0         255.255.255.255 UH    0      0        0 calibddf812340d
+10.200.109.70   0.0.0.0         255.255.255.255 UH    0      0        0 calie719d3d9dc0
+10.200.109.91   0.0.0.0         255.255.255.255 UH    0      0        0 cali7b4b4eb8769
+10.200.109.115  0.0.0.0         255.255.255.255 UH    0      0        0 cali11779054436
+10.200.140.64   192.168.0.192   255.255.255.192 UG    0      0        0 tunl0
+10.200.168.0    192.168.0.183   255.255.255.192 UG    0      0        0 tunl0
+10.200.182.64   192.168.0.182   255.255.255.192 UG    0      0        0 tunl0
+10.200.196.0    192.168.0.181   255.255.255.192 UG    0      0        0 tunl0
+172.16.1.0      0.0.0.0         255.255.255.0   U     0      0        0 eth1
+172.17.0.0      0.0.0.0         255.255.0.0     U     0      0        0 docker0
+192.168.0.0     0.0.0.0         255.255.255.0   U     0      0        0 eth0
+```
+
+```
+root@k8s-master1:~# kubectl exec -it net-test1-68898c85b7-z7rgs sh
+/ # traceroute 172.31.58.83
+traceroute to 172.31.58.83 (172.31.58.83), 30 hops max, 46 byte packets
+ 1 192.168.7.111 (192.168.7.111) 0.011 ms 0.010 ms 0.004 ms
+ 2 172.31.58.64 (172.31.58.64) 0.300 ms 0.505 ms 0.324 ms
+ 3 172.31.58.83 (172.31.58.83) 0.498 ms 0.619 ms 0.422 ms
+/ #
+```
+
+##### 6.2.3.2 关闭IPIP的通信状态
+
+需要重新部署K8S环境,故此处用的是别人的笔记
+
+```
+当前路由表：
+root@k8s-node1:~# route -n
+Kernel IP routing table
+Destination Gateway Genmask Flags Metric Ref Use Iface
+0.0.0.0 192.168.7.254 0.0.0.0 UG 0 0 0 eth0
+172.17.0.0 0.0.0.0 255.255.0.0 U 0 0 0 docker0
+172.31.13.128 192.168.7.111 255.255.255.192 UG 0 0 0 eth0
+172.31.58.64 0.0.0.0 255.255.255.255 UH 0 0 0 cali2fd25f96bb2
+172.31.58.64 0.0.0.0 255.255.255.192 U 0 0 0 *
+172.31.58.65 0.0.0.0 255.255.255.255 UH 0 0 0 calia6efdd98c77
+172.31.185.128 192.168.7.102 255.255.255.255 UGH 0 0 0 eth0
+192.168.0.0 0.0.0.0 255.255.248.0 U 0 0 0 eth0
+root@k8s-master1:/etc/ansible# kubectl run net-test1 --image=alpine --replicas=4 
+sleep 360000 #创建pod进⾏⽹络测试
+root@k8s-master1:/etc/ansible# kubectl exec -it net-test1-68898c85b7-qrh7b sh
+/ # traceroute 172.31.58.65
+traceroute to 172.31.58.65 (172.31.58.65), 30 hops max, 46 byte packets
+1 192.168.7.111 (192.168.7.111) 0.009 ms 0.008 ms 0.004 ms
+2 192.168.7.110 (192.168.7.110) 0.282 ms 0.344 ms 0.145 ms
+3 172.31.58.65 (172.31.58.65) 0.481 ms 0.363 ms 0.197 ms
+```

@@ -3326,13 +3326,107 @@ Calico核心组件:
 - BGP Client:每台node都运⾏,其主要负责监听node节点上由felix⽣成的路由信息,然后通过BGP协议⼴播⾄其他剩余的node节点,从⽽相互学习路由实现pod通信
 - Route Reflector:集中式的路由反射器,calico v3.3开始⽀持,当Calico BGP客户端将路由从其FIB(Forward Information dataBase,转发信息库)通告到Route Reflector时,Route Reflector会将这些路由通告给部署集群中的其他节点,Route Reflector专⻔⽤于管理BGP⽹络路由规则,不会产⽣pod数据通信
 
-注:calico默认⼯作模式是BGP的node-to-node mesh,如果要使⽤Route Reflector需要进⾏相关配置
+注:calico默认⼯作模式是BGP的node-to-node mesh,如果要使⽤Route Reflector需要进⾏相关配置.而且Route Reflector模式很少用,因为Route Reflector本身是个单体,不具备高可用的能力.
 
 [Calico各组件结构](https://projectcalico.docs.tigera.io/reference/architecture/overview)
 
 [Calico网络配置](https://projectcalico.docs.tigera.io/networking/configuring)
 
 ![calico架构](./img/calico架构.png)
+
+Calico是容器的虚拟网卡直接和内核连接,虚拟网卡的另一侧就是Pod.
+
+```
+root@k8s-node-1:~# ifconfig
+cali11779054436: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet6 fe80::ecee:eeff:feee:eeee  prefixlen 64  scopeid 0x20<link>
+        ether ee:ee:ee:ee:ee:ee  txqueuelen 0  (Ethernet)
+        RX packets 3883  bytes 336148 (336.1 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 7503  bytes 595598 (595.5 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+cali4aa6b2a4444: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet6 fe80::ecee:eeff:feee:eeee  prefixlen 64  scopeid 0x20<link>
+        ether ee:ee:ee:ee:ee:ee  txqueuelen 0  (Ethernet)
+        RX packets 5225  bytes 485646 (485.6 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 9908  bytes 787193 (787.1 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+cali7b4b4eb8769: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet6 fe80::ecee:eeff:feee:eeee  prefixlen 64  scopeid 0x20<link>
+        ether ee:ee:ee:ee:ee:ee  txqueuelen 0  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 5  bytes 446 (446.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+calibddf812340d: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet6 fe80::ecee:eeff:feee:eeee  prefixlen 64  scopeid 0x20<link>
+        ether ee:ee:ee:ee:ee:ee  txqueuelen 0  (Ethernet)
+        RX packets 2735  bytes 213345 (213.3 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 1951  bytes 162677 (162.6 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+calie719d3d9dc0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet6 fe80::ecee:eeff:feee:eeee  prefixlen 64  scopeid 0x20<link>
+        ether ee:ee:ee:ee:ee:ee  txqueuelen 0  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 5  bytes 446 (446.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+docker0: flags=4099<UP,BROADCAST,MULTICAST>  mtu 1500
+        inet 172.17.0.1  netmask 255.255.0.0  broadcast 172.17.255.255
+        ether 02:42:85:15:a4:db  txqueuelen 0  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 0  bytes 0 (0.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 192.168.0.191  netmask 255.255.255.0  broadcast 192.168.0.255
+        inet6 fe80::20c:29ff:fe4f:d6cc  prefixlen 64  scopeid 0x20<link>
+        ether 00:0c:29:4f:d6:cc  txqueuelen 1000  (Ethernet)
+        RX packets 83446  bytes 21341767 (21.3 MB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 53299  bytes 6696018 (6.6 MB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+eth1: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 172.16.1.191  netmask 255.255.255.0  broadcast 172.16.1.255
+        inet6 fe80::20c:29ff:fe4f:d6d6  prefixlen 64  scopeid 0x20<link>
+        ether 00:0c:29:4f:d6:d6  txqueuelen 1000  (Ethernet)
+        RX packets 920  bytes 186929 (186.9 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 1266  bytes 191669 (191.6 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536
+        inet 127.0.0.1  netmask 255.0.0.0
+        inet6 ::1  prefixlen 128  scopeid 0x10<host>
+        loop  txqueuelen 1000  (Local Loopback)
+        RX packets 67034  bytes 16074966 (16.0 MB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 67034  bytes 16074966 (16.0 MB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+tunl0: flags=193<UP,RUNNING,NOARP>  mtu 1440
+        inet 10.200.109.64  netmask 255.255.255.255
+        tunnel   txqueuelen 1000  (IPIP Tunnel)
+        RX packets 14942  bytes 979131 (979.1 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 7770  bytes 592484 (592.4 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+```
+
+```
+root@k8s-node-1:~# brctl show
+bridge name	bridge id		STP enabled	interfaces
+docker0		8000.02428515a4db	no
+```
 
 #### 6.2.1 部署过程
 
@@ -3385,6 +3479,8 @@ Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
 172.17.0.0      0.0.0.0         255.255.0.0     U     0      0        0 docker0
 192.168.0.0     0.0.0.0         255.255.255.0   U     0      0        0 eth0
 ```
+
+类似于`cali4aa6b2a4444`的路由,是本机内的通信;`tunl0`的路由,是跨主机的通信.
 
 ```
 root@k8s-master1:~# kubectl exec -it net-test1-68898c85b7-z7rgs sh

@@ -1,0 +1,168 @@
+# 网站监控
+- job_name: 'http_status'
+  metrics_path: /probe
+  params:
+    # 指定blackbox的模块
+    module: [http_2xx]
+  static_configs:
+    # 定义要监控的URL
+    # 这要求blackbox服务器能够解析这些域名并能够访问这些网站
+    - targets: ['http://www.xiaomi.com', 'http://www.gemzen.com']
+      # 自行添加的k-v格式数据 用于promeQL的查询
+      labels:
+        instance: http_status
+        group: web
+  #relabel通过将 __address__(当前目标地址)写入__param_target标签来创建一个label
+  relabel_configs:
+    # __address__是一个变量 表示targets中每一个URL的IP地址
+    # source_labels和target_label是一个k-v 二者生成一个新的label
+    # 其中target_label是key source_labels是value
+    - source_labels: [__address__]
+      # 本例中__param_target即为www.xiaomi.com 和 www.gemzen.com
+      target_label: __param_target
+    - source_labels: [__param_target]
+      # url类似于K8S中pod的label
+      # 本例中就会有2个k-v url:www.xiaomi.com 和 url:www.gemzen.com
+      # 用于绘图用 只是监控的话可以不加
+      target_label: url
+    - target_label: __address__
+      # replacement:是blackbox的地址 表示将监控项传递给blackbox
+      replacement: 192.168.0.207:9115
+
+  # icmp 检测
+  - job_name: 'ping_status'
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    static_configs:
+      - targets: ["192.168.0.191","223.6.6.6"]
+        labels:
+          instance: 'ping_status'
+          group: 'icmp'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        #以ip为key __param_target为value 创建一个k-v作为label
+        target_label: ip
+      - target_label: __address__
+        replacement: 192.168.0.207:9115
+
+  # 端口监控
+  - job_name: 'port_status'
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    static_configs:
+      - targets: ['192.168.0.181:30002', '192.168.0.181:6443', '192.168.0.184:80', '192.168.0.204:9090']
+        labels:
+          instance: 'port_status'
+          group: 'port'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: ip
+      - target_label: __address__
+        replacement: 192.168.0.207:9115
+
+  - job_name: 'prometheus-containers'
+    static_configs:
+      - targets: ["192.168.0.191:8080","192.168.0.192:8080","192.168.0.193:8080"]
+
+global:
+  #在指定时间内没有产生新的事件就发送恢复通知
+  resolve_timeout: 5m
+  # 邮箱服务的smtp地址
+  smtp_smarthost: 'smtp.qq.com:465'
+  # 发件人邮箱地址
+  smtp_from: '发件人邮箱'
+  # 发件人的登录用户名 默认和发件人地址一致
+  smtp_auth_username: '发件人邮箱'
+  # 发件人的邮箱授权码
+  smtp_auth_password: '发件人邮箱授权码'
+  # 通常是域名后缀
+  smtp_hello: '@qq.com'
+  # 是否需要tls协议 默认为true
+  smtp_require_tls: false
+
+# route用于设置报警的分发策略 
+route:
+  # 采用哪个标签来作为分组依据 在prometheus的报警规则文件(rule.yml)中
+  # 可以配置标签名
+  group_by: ['alertname'] 
+  # 分组告警等待时间 即:告警产生后等待10s 然后若有同组告警 一起发出
+  group_wait: 10s
+  # 两组告警之间的间隔时间
+  group_interval: 2s
+  # 重复告警的间隔时间 用于减少相同邮件的发送频率
+  repeat_interval: 2m
+  # 接收人信息 即receivers.name 可以有多个
+  receiver: 'web.hook'
+receivers:
+- name: 'web.hook'
+  # webhook_configs:
+  # - url: 'http://127.0.0.1:5001/'
+  email_configs:
+    - to: '收件人邮箱'
+
+# 抑制的规则
+inhibit_rules:
+  # 源匹配级别 当匹配成功发出通知 但是其他的通知将被抑制
+  - source_match:
+      # 要发送的警告级别
+      severity: 'critical'
+    # 抑制级别 在同一时刻内同时出现source_match中定义的警告级别和target_match中定义的警告级别时
+    # target_match中定义的警告级别将不会被发送
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'dev', 'instance']
+
+groups:
+  - name: alertmanager_pod.rules
+    rules:
+    - alert: Pod_all_cpu_usage
+      expr: (sum by(name)(rate(container_cpu_usage_seconds_total{image!=""}[5m]))*100) > 1
+      # 2次检查之间的时间间隔 altermanager不会在第1次检查失败时就发送告警信息
+      # 而是在第1次检查失败时将alert的状态置为pending
+      # 当第2次检查还是失败时 将alert的状态置为firing并发送邮件
+      for: 2m
+      # 警告的标签
+      labels:
+        # 警告级别
+        severity: critical
+        # 警告对应的资源 pod/node或其他对应的资源
+        service: pods
+      annotations:
+        # 告警内容
+        # $labels.name 容器名称
+        # $value 计算之前的值 此处即为rate(container_cpu_usage_seconds_total{image!=""}[5m]
+        description: 容器 {{ $labels.name }} CPU 资源利用率大于 10% , (current value is {{ $value }})
+        summary: Dev CPU 负载告警
+    - alert: Pod_all_memory_usage
+      # 已用内存大于2G
+      expr: sort_desc(avg by(name)(irate(container_memory_usage_bytes{name!=""}[5m])))/1024/1024/1024 > 2
+      # 可用内存大于2G
+      # expr: sort_desc(avg by(name)(irate(node_memory_MemFree_bytes {name!=""}[5m])))/1024/1024/1024 > 2
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        description: 容器 {{ $labels.name }} Memory 资源利用率大于 2G , (current value is {{ $value }})
+        summary: Dev Memory 负载告警
+    - alert: Pod_all_network_receive_usage
+      # 1分钟内接收超过50M的数据
+      expr: sum by (name)(irate(container_network_receive_bytes_total{container_name="POD"}[1m]))/1024/1024 > 50
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        description: 容器 {{ $labels.name }} network_receive 资源利用率大于 50M , (current value is {{ $value }})
+    - alert: Node内存可用大小
+      # 故意写错的 为了能触发告警
+      expr: node_memory_MemFree_bytes > 1
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        description: 容器可用内存小于100k

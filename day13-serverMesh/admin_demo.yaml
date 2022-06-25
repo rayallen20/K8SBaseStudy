@@ -1,0 +1,6 @@
+admin:
+  access_log_path: /tmp/admin_access.log
+  address:
+    # 提示:此处仅为出于方便测试的目的 才设定其监听于对外通信的任意IP地址
+    # 安全起见应该使用127.0.0.1
+    socket_address: { address: 0.0.0.0, port_value: 9901 }

@@ -1,0 +1,46 @@
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      # 此处envoy和web服务共享同一个网络空间
+      # 因此如果web服务要对外发送一个请求 那么这个请求是可以通过地址+端口的方式
+      # 直接到达envoy的
+      # 此处web服务是作为服务端 对外发送请求 envoy是服务端
+      # 此处envoy的地址和端口 是用于被web服务访问的
+      socket_address: { address: 127.0.0.1, port_value: 80 }
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: web_service_1
+              domains: ["*"]
+              routes:
+              - match: { prefix: "/" }
+                route: { cluster: web_cluster }
+          http_filters:
+          - name: envoy.filters.http.router
+
+  clusters:
+    # 此处的clusters是外部的
+    # 此处的外部可以理解为是envoy+web服务这个容器外部的集群
+    # 上边定义的侦听器面向本地的web服务的 而此处定义的cluster是外部的服务
+  - name: web_cluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: web_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address: { address: 172.31.4.11, port_value: 80 }
+        - endpoint:
+            address:
+              socket_address: { address: 172.31.4.12, port_value: 80 }

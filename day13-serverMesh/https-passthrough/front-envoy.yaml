@@ -1,0 +1,47 @@
+admin:
+  profile_path: /tmp/envoy.prof
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address:
+       address: 0.0.0.0
+       port_value: 9901
+
+static_resources:
+  listeners:
+  - name: listener_http
+    address:
+      # 由于使用passthrough直接透传 所以此处是TCP代理
+      socket_address: { address: 0.0.0.0, port_value: 8443 }
+    filter_chains:
+    - filters:
+      # 此处使用的是tcp_proxy
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          cluster: web_cluster_01
+          stat_prefix: https_passthrough
+
+  # 集群里也不需要配置transport_socket 因为集群不管是不是TLS连接
+  # 集群只知道下游是一个TCP代理 所以集群也不解析 因此也不需要配置证书等内容
+  # 因为TLS会话是直接在客户端与服务端之间进行的
+  # 这样通信的问题在于:每次TLS会话都是客户端与服务端建立,而后端如果有多个节点
+  # 则每次请求都有可能会调度到一个不同的服务器上
+  # 这导致TLS Cache(Session Cache)是用不上的
+  # 因为TLS会话的交换与建立需要大量的CPU时钟周期参与 通常这个计算过程结束后 都会缓存起来
+  # 默认缓存5分钟 也就表示同一个客户端在5分钟之内再次请求的话 就不需要这个计算的过程
+  # 直接使用缓存实现TLS加速即可
+  clusters:
+  - name: web_cluster_01
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: web_cluster_01
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address: { address: 172.31.9.11, port_value: 443 }
+        - endpoint:
+            address:
+              socket_address: { address: 172.31.9.12, port_value: 443 }

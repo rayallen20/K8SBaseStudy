@@ -1,0 +1,39 @@
+static_resources:
+  # 监听器配置 监听对外通信的地址
+  listeners:
+  - name: listener_0
+    address:
+      # 监听器监听的socket的地址和端口
+      socket_address: { address: 0.0.0.0, port_value: 80 }
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: web_service_1
+              domains: ["*"]
+              routes:
+              - match: { prefix: "/" }
+                route: { cluster: local_cluster }
+          http_filters:
+          - name: envoy.filters.http.router
+
+  # 集群配置
+  clusters:
+  - name: local_cluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: local_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              # 端点监听本地的8080端口
+              socket_address: { address: 127.0.0.1, port_value: 8080 }

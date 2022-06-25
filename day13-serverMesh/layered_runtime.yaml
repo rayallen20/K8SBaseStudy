@@ -1,0 +1,30 @@
+# 配置运行配置供应者 未指定时则使用null供应者 即所有参数均加载其默认值
+layered_runtime: 
+  # 运行时的层级列表 写在后面的层将覆盖写在前面的层上的配置
+  layers: 
+  # 运行时的层级名称 仅用于“GET /runtime”时的输出
+  - name: ... 
+    # 该配置 以及后面三个层级类型(disk_layer admin_layer rtds_layer)
+    # 彼此互斥 因此一个列表项中仅可定义一层
+    # 静态运行时层级 遵循运行时probobuf JSON表示编码格式
+    # 不同于静态的xDS资源 静态运行时层一样可被后面的层所覆盖
+    static_layer: {...} 
+    # 基于本地磁盘的运行时层级
+    disk_layer: {...} 
+      # 通过符号链接访问的文件系统树
+      symlink_root: ... 
+      # 指定要在根目录中加载的子目录
+      subdirectory: ... 
+      # 是否将服务集群附加至符号链接根目录下的子路径上
+      append_service_cluster: ...
+    # 管理控制台运行时层级
+    # 该层通过/runtime管理端点查看
+    # 该层通过/runtime_modify管理端点修改的配置方式
+    admin_layer: {...}
+    # 运行时发现服务(runtime discovery service)层级
+    # 即通过xDS API中的RTDS API动态发现相关的层级配置
+    rtds_layer: {...} 
+      # 在rtds_config上为RTDS层订阅的资源
+      name: ...
+      # RTDS的ConfigSource
+      rtds_config:

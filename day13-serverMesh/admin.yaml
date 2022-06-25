@@ -1,0 +1,16 @@
+admin:
+  # 访问日志协议的相关配置 通常需要指定日志过滤器及日志配置等
+  # 用于字段admin接口的访问日志格式等信息
+  access_log: [] 
+  # 管理接口的访问日志文件路径 无须记录访问日志时使用/dev/null
+  # 定义访问日志的存储路径
+  access_log_path: ... 
+  # cpu profiler的输出路径 默认为/var/log/envoy/envoy.prof
+  # 若不需记录cpu性能 则不定义该字段即可
+  profile_path: ... 
+  address: 
+    # 监听的套接字
+    socket_address: 
+      protocol: ...
+      address: ...
+      port_value: ...

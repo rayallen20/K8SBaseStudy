@@ -1,0 +1,57 @@
+version: '3.3'
+
+services:
+  # envoy服务(容器)
+  envoy:
+    image: envoyproxy/envoy-alpine:v1.21-latest
+    volumes:
+    - ./envoy.yaml:/etc/envoy/envoy.yaml
+    networks:
+      envoymesh:
+        # envoy的地址
+        ipv4_address: 172.31.4.2
+        aliases:
+        - front-proxy
+    depends_on:
+    - webserver01
+    - webserver02
+
+  # client服务(容器)是envoy的客户端
+  # 为了模拟envoy作为egress Sidecar的效果
+  # 需要进入client服务(容器) 并使用该服务的交互式接口
+  client:
+    # 该镜像也是课上演示用的
+    image: ikubernetes/admin-toolbox:v1.0
+    # 和envoy服务(容器)共享同一个Network Namespace
+    network_mode: "service:envoy"
+    depends_on:
+    - envoy
+
+  # webserver01服务(容器)即为envoy的配置文件中定义的"外部"的服务
+  # 此处为了降低复杂度 webserver01和webserver02是没有加Sidecar的
+  # 如果从合规的视角来看 webserver01和webserver02是应该有ingress Sidecar的
+  webserver01:
+    image: ikubernetes/demoapp:v1.0
+    hostname: webserver01
+    networks:
+      envoymesh:
+        ipv4_address: 172.31.4.11
+        aliases:
+        - webserver01
+
+  # webserver02服务(容器)也是envoy的配置文件中定义的"外部"的服务
+  webserver02:
+    image: ikubernetes/demoapp:v1.0
+    hostname: webserver02
+    networks:
+      envoymesh:
+        ipv4_address: 172.31.4.12
+        aliases:
+        - webserver02
+
+networks:
+  envoymesh:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.4.0/24

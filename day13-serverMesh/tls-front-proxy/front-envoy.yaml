@@ -1,0 +1,76 @@
+admin:
+  profile_path: /tmp/envoy.prof
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address:
+       address: 0.0.0.0
+       port_value: 9901
+
+static_resources:
+  listeners:
+  - name: listener_http
+    address:
+      # 若使用TLS连接 则此处的端口要求必须基于TLS通信
+      # 端口具体是多少无所谓 只是此处为了让使用者知道是TLS通信
+      # 故通常使用X443的方式定义端口
+      socket_address: { address: 0.0.0.0, port_value: 8443 }
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: web_service_01
+              domains: ["*"]
+              routes:
+              - match: { prefix: "/" }
+                route: { cluster: web_cluster_01 }
+          http_filters:
+          - name: envoy.filters.http.router
+      # 要实现和下游的TLS连接 需要在和filter对等的级别上建立transport_socket
+      # 表示要提供TLS通信的配置
+      transport_socket:
+        # name字段为固定字符串 表示调用指定的过滤器(或者说扩展)来实现TLS通信的配置
+        name: envoy.transport_sockets.tls
+        # TLS扩展专用的类型化配置
+        typed_config:
+          # 固定字符串 注意这个类型的名称为DownstreamTlsContext 即面向下游连接专用的
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          # 通用TLS配置
+          common_tls_context:
+            # 指明TLS证书
+            tls_certificates:
+            # The following self-signed certificate pair is generated using:
+            # $ openssl req -x509 -newkey rsa:2048 -keyout front-proxy.key -out front-proxy.crt -days 3650 -nodes -subj '/CN=www.gemzen.com'
+            #
+            # 指明crt证书(Server端证书)的位置
+            - certificate_chain:
+                # 可以通过容器内部的路径来加载证书
+                filename: "/etc/envoy/certs/front-proxy.crt"
+              # 指明私钥文件的位置
+              private_key:
+                filename: "/etc/envoy/certs/front-proxy.key"
+
+  clusters:
+  - name: web_cluster_01
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: web_cluster_01
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address: { address: 172.31.7.11, port_value: 80 }
+        - endpoint:
+            address:
+              socket_address: { address: 172.31.7.12, port_value: 80 }
+#    transport_socket:
+#      name: envoy.transport_sockets.tls
+#      typed_config:
+#        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext

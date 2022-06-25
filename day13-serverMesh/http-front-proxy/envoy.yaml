@@ -1,0 +1,74 @@
+# 纯静态配置
+static_resources:
+  # 定义侦听器
+  listeners:
+    # 侦听器名称
+  - name: listener_0
+    address:
+      # 侦听器监听的socket
+      socket_address: { address: 0.0.0.0, port_value: 80 }
+    # 侦听器的过滤器链
+    filter_chains:
+    - filters:
+      # 过滤器名称
+      # 此处该过滤器就是负责实现7层HTTP协议代理的过滤器
+      - name: envoy.filters.network.http_connection_manager
+        # 类型化配置定义
+        typed_config:
+          # @type字段的值是内建的固定字符串
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          # 统计日志的前缀
+          stat_prefix: ingress_http
+          # 编解码方式
+          codec_type: AUTO
+          # 路由配置
+          route_config:
+            name: local_route
+            # 虚拟主机配置
+            virtual_hosts:
+              # 虚拟主机名称
+            - name: web_service_1
+              # 此处和虚拟主机的配置一样 访问domains字段中域名的流量
+              # 匹配前缀起始于根路径的 派发给集群local_cluster
+              # 此处匹配条件由match字段定义 指定集群由route字段指定
+              domains: ["*.ik8s.io", "ik8s.io"]
+              routes:
+              - match: { prefix: "/" }
+                route: { cluster: local_cluster }
+            - name: web_service_2
+              # 访问domains字段中域名的流量 重定向给host_redirect字段
+              # 中定义的域名 但此处host_redirect字段定义的域名
+              # 就是web_service_1中的domains
+              domains: ["*.gemzen.cn","gemzen.cn"]
+              routes:
+              - match: { prefix: "/" }
+                redirect:
+                  host_redirect: "www.ik8s.io"
+          http_filters:
+          - name: envoy.filters.http.router
+  # 定义若干个集群
+  clusters:
+    # 集群名称
+  - name: local_cluster
+    # 连接超时时长
+    connect_timeout: 0.25s
+    # 集群类型 或者说是集群发现方法 用于定义集群的端点从哪来的
+    # STATIC表示纯静态定义 也可以基于EDS发现 或者DNS发现
+    type: STATIC
+    # 定义负载均衡策略为轮询
+    lb_policy: ROUND_ROBIN
+    # 定义后端端点
+    load_assignment:
+      cluster_name: local_cluster
+      # 定义端点
+      endpoints:
+        # 此处的lb不是load balance的意思
+        # 而是基于位置的定义 Locality Base的缩写
+      - lb_endpoints:
+        - endpoint:
+            address:
+              # 定义endpoint的地址和端口
+              socket_address: { address: 172.31.2.11, port_value: 8080 }
+        - endpoint:
+            address:
+              socket_address: { address: 172.31.2.12, port_value: 8080 }

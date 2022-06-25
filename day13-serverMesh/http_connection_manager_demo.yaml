@@ -1,0 +1,38 @@
+listeners:
+  - name: 
+    address:
+      socket_address: { address: ..., port_value: ..., protocol: ... }
+    filter_chains: 
+    - filters:
+      # 固定字符串
+      - name: envoy.filters.network.http_connection_manager
+        # 类型化固有配置
+        typed_config:
+          # 类型名 固有字符串
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          # 统计信息中使用的信息前缀 通常为了易读性而配置
+          stat_prefix: ... 
+          # 静态路由配置 动态配置应该使用rds字段进行指定
+          route_config: 
+            # 路由配置的名称
+            name: ... 
+            # 虚拟主机列表 用于构成路由表
+            # 此处定义的虚拟主机 监听的socket为listeners.address.socket_address
+            virtual_hosts: 
+            # 虚拟主机的逻辑名称 用于统计信息 与路由无关
+            # 1个socket可以被多个虚拟主机监听 但是需要基于这些虚拟主机的主机名才能实现
+            # 因此每个虚拟主机有一个逻辑名称字段
+            - name: ... 
+              # 当前虚拟主机匹配的域名列表,支持使用"*"通配符
+              # 匹配搜索次序为精确匹配、前缀通配、后缀通配及完全通配
+              # 定义该虚拟主机适配的主机名 若请求能被该虚拟主机适配 则该虚拟主机处理该请求
+              # 否则检查下一个虚拟主机 若所有虚拟主机都无法处理(都不适配)该请求
+              # 则该listener无法处理该请求
+              domains: []
+              # 指定的域名下的路由列表 
+              # 执行时按顺序搜索 第一个匹配到路由信息即为使用的路由机制
+              routes: []
+          # 定义http过滤器链 
+          http_filters: 
+          # 调用7层的路由过滤器
+          - name: envoy.filters.http.router 

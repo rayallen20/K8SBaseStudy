@@ -1,0 +1,16 @@
+layered_runtime: 
+  layers:
+  - name: static_layer_0
+    # 静态引导配置层 直接指定配置的运行时参数及其值
+    static_layer:
+      health_check:
+      min_interval: 5
+  - name: disk_layer_0
+    # 本地磁盘文件系统
+    disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy }
+  - name: disk_layer_1
+    # 本地磁盘文件系统 子目录覆盖
+    disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy_override, append_service_cluster: true }
+  - name: admin_layer_0
+    # 管理控制台层
+    admin_layer: {}

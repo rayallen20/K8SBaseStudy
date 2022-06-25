@@ -1,0 +1,51 @@
+version: '3'
+
+# 定义服务
+services:
+  # 服务名称
+  # 定义envoy以sidecar的形式运行在应用旁边
+  envoy:
+    # envoy使用的镜像
+    image: envoyproxy/envoy-alpine:v1.21-latest
+    volumes:
+      # 将同路径下的envoy.yaml 挂载到容器的/etc/envoy/目录下
+      # 该路径为envoy启动时默认加载的配置文件路径
+    - ./envoy.yaml:/etc/envoy/envoy.yaml
+    environment:
+      - ENVOY_UID=0
+      - ENVOY_GID=0
+    networks:
+      envoymesh:
+        # 指定envoy的IP地址
+        ipv4_address: 172.31.3.2
+        aliases:
+        - ingress
+
+  webserver01:
+    # 课上用的一个小镜像 用于模拟web服务
+    # 可以以传递环境变量的方式改变该服务监听的地址和端口
+    image: ikubernetes/demoapp:v1.0
+    environment:
+      # 指定程序监听的端口和地址
+      - PORT=8080
+      - HOST=127.0.0.1
+    # 网络模式 共享名称为envoy的服务的网络
+    # 所以实际上webserver01服务(容器)和envoy服务(容器)是共享
+    # 同一个网络名称空间的 这样才能模拟出sidecar的结构
+    # 此处"service:" 是固定字符串 "envoy"是服务(容器)的名称
+    network_mode: "service:envoy"
+    # 定义依赖关系
+    depends_on:
+    - envoy
+
+# 网络定义 该网络是用户空间手动定义的
+networks:
+  # envoymesh为网络名称
+  envoymesh:
+    # 驱动类型为本地桥接
+    driver: bridge
+    # 地址分配
+    ipam:
+      config:
+        # 自定义的网段
+        - subnet: 172.31.3.0/24

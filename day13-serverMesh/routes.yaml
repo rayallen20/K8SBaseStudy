@@ -1,0 +1,7 @@
+routes: 
+  # 该路由的名称
+- name: ... 
+  # 匹配规则 请求的URL的前缀
+  match: {prefix: ... }
+  # 路由条目 目标上游集群
+  route: {cluster: }

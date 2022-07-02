@@ -225,6 +225,9 @@ root@k8s-haproxy-2:~/eds-filesystem# mkdir eds.conf.d
 root@k8s-haproxy-2:~/eds-filesystem# cd eds.conf.d/
 root@k8s-haproxy-2:~/eds-filesystem/eds.conf.d# vim eds.yaml
 root@k8s-haproxy-2:~/eds-filesystem/eds.conf.d# cat eds.yaml
+```
+
+```yaml
 resources:
 - "@type": type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment
   # 集群名称 建议与clusters.name一致 clusters.name是集群外部引用时的名称

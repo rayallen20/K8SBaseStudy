@@ -1,0 +1,24 @@
+clusters: 
+- name: service_httpbin
+  connect_timeout: 2s
+  type: LOGICAL_DNS 
+  dns_lookup_family: V4_ONLY
+  lb_policy: ROUND_ROBIN
+  load_assignment: 
+    cluster_name: service_httpbin
+    endpoints: 
+    - lb_endpoints:
+      - endpoint: 
+          address: 
+            socket_address: 
+              address: httpbin.org
+              port_value: 80
+  circuit_breakers:
+    thresholds: 
+    # 最大并发连接数:1
+    max_connections: 1 
+    # 被挂起的最大请求数: 1
+    # 即:该集群同一时刻只处理1个请求 超过1个请求就触发熔断器
+    max_pending_requests: 1 
+    # 最大重试次数:3
+    max_retries: 3

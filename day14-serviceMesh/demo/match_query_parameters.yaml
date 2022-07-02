@@ -1,0 +1,19 @@
+query_parameters:
+  # 参数名称
+  name: "..."
+  # 参数值的字符串匹配检查 支持使用以下五种检查方式其中之一进行字符串匹配
+  string_match: "{...}" 
+    # 精确值
+    exact: "..."
+    # 前缀匹配
+    prefix: "..."
+    # 后缀匹配
+    suffix: "..."
+    # 包含
+    contains: "..."
+    # 正则
+    safe_regex: "{...}" 
+    # 忽略大小写
+    ignore_case: "..." 
+  # 参数的存在性匹配
+  present_match: "..."

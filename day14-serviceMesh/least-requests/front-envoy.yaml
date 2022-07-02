@@ -1,0 +1,67 @@
+admin:
+  profile_path: /tmp/envoy.prof
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address: { address: 0.0.0.0, port_value: 9901 }
+
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address: { address: 0.0.0.0, port_value: 80 }
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: webservice
+              domains: ["*"]
+              routes:
+              - match: { prefix: "/" }
+                route: { cluster: web_cluster_01 }
+          http_filters:
+          - name: envoy.filters.http.router
+
+  clusters:
+  - name: web_cluster_01
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    # 负载均衡策略为加权最小请求算法
+    # 本例中各端点的权重是不同的 因此不需要配置least_request_lb_config.choice_count
+    # 直接取 权重 / 当前活动请求数 即可
+    # 权重不同时的调度:以1为基准值(不可能有某个节点的权重比1还小了)记录节点
+    # 即:权重为1的主机 记为1个节点
+    # 权重为3的主机 记为3个节点
+    # 权重为5的主机 记为5个节点
+    # 在这些节点之间进行轮询 因此实际效果上来看是9个节点
+    lb_policy: LEAST_REQUEST
+    load_assignment:
+      cluster_name: web_cluster_01
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: red
+                port_value: 80
+          # 权重为1
+          load_balancing_weight: 1
+        - endpoint:
+            address:
+              socket_address:
+                address: blue
+                port_value: 80
+          # 权重为3
+          load_balancing_weight: 3
+        - endpoint:
+            address:
+              socket_address:
+                address: green
+                port_value: 80
+          # 权重为5
+          load_balancing_weight: 5

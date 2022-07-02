@@ -1,0 +1,16 @@
+dynamic_resources:
+  lds_config:
+    # xDS资源配置遵循的API版本 v1.19版本及以后仅支持V3
+    resource_api_version: ... 
+    api_config_source:
+      # xDS传输协议中使用API版本 v1.19版本及以后仅支持V3
+      transport_api_version: ... 
+      # API可经由REST或gRPC获取 支持的类型包括REST、GRPC和DELTA_GRPC
+      api_type: REST 
+      # 提供服务的集群名称列表 仅能与REST类型的API一起使用
+      # 多个集群是为了冗余 当有故障时将循环访问
+      cluster_names: ... 
+      # REST API轮询时间间隔
+      refresh_delay: ... 
+      # REST API请求超时时长 默认为1s
+      request_timeout: ... 

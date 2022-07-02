@@ -1,0 +1,35 @@
+clusters:
+- name: webcluster1
+  connect_timeout: 0.25s
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  common_lb_config:
+    locality_weighted_lb_config: {}
+  load_assignment:
+    cluster_name: webcluster1
+    policy:
+      # 超配因子 1.4
+      overprovisioning_factor: 140
+    endpoints:
+    - locality:
+        region: cn-north-1
+      priority: 0
+      # 位置权重
+      load_balancing_weight: 1
+      lb_endpoints: 
+      - endpoint:
+          address:
+            socket_address:
+              address: colored
+              port_value: 80
+    - locality:
+        region: cn-north-2
+      priority: 0
+      # 位置权重
+      load_balancing_weight: 2
+      lb_endpoints: 
+      - endpoint:
+          address:
+            socket_address:
+              address: myservice
+              port_value: 80

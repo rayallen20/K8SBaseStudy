@@ -1,0 +1,12 @@
+resources:
+- "@type": type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment
+  # 集群名称 建议与clusters.name一致 clusters.name是集群外部引用时的名称
+  # resources.cluster_name是集群内部被集群管理器管理时使用的名称
+  cluster_name: webcluster
+  endpoints:
+  - lb_endpoints:
+    - endpoint:
+        address:
+          socket_address:
+            address: 172.31.11.11
+            port_value: 80

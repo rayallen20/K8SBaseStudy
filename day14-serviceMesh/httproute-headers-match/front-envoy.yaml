@@ -1,0 +1,105 @@
+admin:
+  profile_path: /tmp/envoy.prof
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address:
+       address: 0.0.0.0
+       port_value: 9901
+
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address: { address: 0.0.0.0, port_value: 80 }
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: vh_001
+              domains: ["*"]
+              routes:
+              - match:
+                  # 默认路由 因为每个URL后边其实默认的path就是/
+                  # 例如:访问https://www.baidu.com
+                  # 和访问https://www.baidu.com/
+                  # 效果是相同的
+                  prefix: "/"
+                  headers:
+                    # 若请求头中含有一个名为X-Canary的字段
+                    # 且该字段值为true
+                  - name: X-Canary
+                    exact_match: "true"
+                route:
+                  # 则将流量调度到名为demoappv12的集群上
+                  cluster: demoappv12
+              - match:
+                  prefix: "/"
+                  query_parameters:
+                    # 若请求的参数列表中有一个名为username的参数
+                    # 且该参数的值 以vip_开头
+                  - name: "username"
+                    # 字符串匹配
+                    string_match:
+                      # 前缀匹配
+                      prefix: "vip_"
+                route:
+                  # 则将流量调度到名为demoappv11的集群上
+                  cluster: demoappv11
+              - match:
+                  # 默认路由 以上2个条件都不符和时
+                  prefix: "/"
+                route:
+                  # 则将流量调度到名为demoappv10的集群上
+                  cluster: demoappv10
+          http_filters:
+          - name: envoy.filters.http.router
+
+  clusters:
+  - name: demoappv10
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: demoappv10
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: demoappv10
+                port_value: 80
+
+  - name: demoappv11
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: demoappv11
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: demoappv11
+                port_value: 80
+
+  - name: demoappv12
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: demoappv12
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: demoappv12
+                port_value: 80
+                

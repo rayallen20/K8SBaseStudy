@@ -1,0 +1,33 @@
+clusters:
+- name: webcluster1
+  connect_timeout: 0.25s
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  load_assignment:
+    cluster_name: webcluster1
+    endpoints:
+    - locality:
+        region: cn-north-1
+      # 优先级0 该端点组的优先级较高
+      priority: 0
+      lb_endpoints: 
+        - endpoint:
+            address:
+            socket_address:
+              address: webservice1
+              port_value: 80
+    - locality:
+        region: cn-north-2
+      # 优先级1 该端点组的优先级较高
+      priority: 1
+      lb_endpoints: 
+        - endpoint:
+            address:
+            socket_address:
+              address: webservice2
+              port_value: 80
+  # 如果有优先级 那么要定义健康状态监测
+  # 否则无法得知端点的健康状况
+  # 因此说健康状态影响优先级调度结果
+  health_checks: 
+    - ...

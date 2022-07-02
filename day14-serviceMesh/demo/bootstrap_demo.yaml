@@ -1,0 +1,30 @@
+# bootstrap专用的顶级配置段
+node:
+  # envoy的ID信息 用于让Management Server确认Envoy的信息
+  # Management Server进而根据该Envoy的信息下发对应于该Envoy的配置
+  # An opaque node identifier for the Envoy node. 
+  id: … 
+  # 指明Envoy所属的集群
+  # Defines the local service cluster name where Envoy is running. 
+  cluster: …
+  # 指明Envoy的元数据信息 
+  # Opaque metadata extending the node identifier. Envoy will pass this directly to the management server.
+  metadata: {…} 
+  # 指明Envoy所在的位置
+  # Locality specifying where the Envoy instance is running.
+  locality: 
+    region: …
+    zone: …
+    sub_zone: …
+  # 自定义的(模拟的)user_agent的名称
+  # Free-form string that identifies the entity requesting config. E.g. “envoy” or “grpc”
+  user_agent_name: … 
+  # 自定义的user_agent的版本
+  # Free-form string that identifies the version of the entity requesting config. E.g. “1.12.2” or “abcd1234” , or “SpecialEnvoyBuild”
+  user_agent_version: … 
+  user_agent_build_version: # Structured version of the entity requesting config.
+    version: …
+    metadata: {…}
+  extensions: [ ] # List of extensions and their versions supported by the node.
+  client_features: [ ]
+  listening_addresses: [ ] # Known listening ports on the node as a generic hint to the management server for filtering listeners to be returned

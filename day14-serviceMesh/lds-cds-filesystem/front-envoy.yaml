@@ -1,0 +1,21 @@
+# 若要使用动态配置 则顶级配置字段node必须写
+node:
+  # id 和 cluster 两个字段也必须写
+  id: envoy_front_proxy
+  cluster: Roach_Cluster
+
+admin:
+  profile_path: /tmp/envoy.prof
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address:
+       address: 0.0.0.0
+       port_value: 9901
+
+dynamic_resources:
+  # lds的相关配置
+  lds_config:
+    path: /etc/envoy/conf.d/lds.yaml
+  # cds的相关配置
+  cds_config:
+    path: /etc/envoy/conf.d/cds.yaml

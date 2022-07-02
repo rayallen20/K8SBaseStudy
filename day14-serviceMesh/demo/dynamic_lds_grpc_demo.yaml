@@ -1,0 +1,24 @@
+dynamic_resouces:
+  lds_config:
+    api_config_source:
+      # API可经由REST或gRPC获取 支持的类型包括REST、gRPC和delta_gRPC 
+      # 也就是说api_type字段的值只能是 REST gRPC 和 delta_gRPC 三者之一
+      api_type: ... 
+      # xDS资源的API版本 对于1.19及之后的Envoy版本 要使用v3
+      # 因为1.19之后v2被废弃了
+      resource_api_version: ... 
+      # 速率限制
+      rate_limit_settings: {...} 
+      # 提供grpc服务的一到多个服务源
+      grpc_services: 
+        # xDS传输协议使用的API版本 对于1.19及之后的Envoy版本 要使用v3
+        transport_api_version: ... 
+        # Envoy内建的grpc客户端 envoy_grpc和google_grpc二者仅能用其一
+        # 一般都是使用envoy_grpc 只有google内部才会用google_grpc
+        envoy_grpc: 
+          # grpc集群的名称
+          cluster_name: ... 
+        # Google的C++ grpc客户端
+        google_grpc: 
+        # grpc超时时长
+        timeout: ... 

@@ -1,0 +1,22 @@
+clusters:
+- name ...
+  ...
+  lb_subset_config:
+    # 回退策略 默认为NO_FALLBACK
+    fallback_policy: "..." 
+    # 回退策略DEFAULT_SUBSET使用的默认子集
+    default_subset: "{...}" 
+    # 定义子集选择器 在集群上先定义出子集选择器
+    # 然后才能在路由中使用子集选择器
+    subset_selectors: [] 
+    # 定义一个选择器 指定用于归类主机元数据的键列表
+    - keys: []
+      # 当前选择器专用的回退策略
+      fallback_policy: ... 
+    # 是否在将请求路由到子集时考虑端点的位置和位置权重 存在一些潜在的缺陷
+    locality_weight_aware: "..." 
+    # 是否将子集与主机中的主机比率来缩放每个位置的权重
+    scale_locality_weight: "..." 
+    # 是否在配置回退策略且其相应的子集无法找到主机时尝试从整个集群中选择主机
+    panic_mode_any: "..." 
+    list_as_any": "..."

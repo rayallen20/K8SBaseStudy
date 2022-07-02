@@ -1,0 +1,66 @@
+admin:
+  profile_path: /tmp/envoy.prof
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address: { address: 0.0.0.0, port_value: 9901 }
+
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address: { address: 0.0.0.0, port_value: 80 }
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: webservice
+              domains: ["*"]
+              routes:
+              - match: { prefix: "/" }
+                route: { cluster: web_cluster_01 }
+          http_filters:
+          - name: envoy.filters.http.router
+  clusters:
+  - name: web_cluster_01
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: web_cluster_01
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address: { address: myservice, port_value: 80 }
+    health_checks:
+      # 指定主动健康检测的超时时长为5s
+    - timeout: 5s
+      # 每10s主动发起一次检测
+      # 检测密度越高 越早发现故障 
+      # 但是同样的 上游服务器的流量压力也就越大
+      # 上游服务器的访问日志中 还要把这种健康状态监测的请求日志过滤掉
+      interval: 10s
+      # 健康状态检测是连续的 上一次检测结果为健康 可能这一次的检测结果就是不健康
+      # 但此时的状态为软状态 并不是直接根据这1次的不健康结果就把该端点的状态修改为不健康
+      # 而是需要连续几次的检测结果均为不健康 才将端点的状态从健康修改为不健康
+      # 此时的状态修改为硬状态 而这里的"连续几次"即为一种阈值 称为非健康阈值
+      unhealthy_threshold: 2
+      # 当端点状态为不健康时 连续健康多少次之后 将端点的硬状态从不健康修改为健康
+      # 即健康阈值 通常从不健康转换到健康 只检测1次即可 此处写2次是为了演示
+      # 因为从过去的一直失败的状态 到能够成功检测1次 很有可能出现的情况是端点又上线了
+      # 生产环境也有写2次的 通常是为了避免比较玄学的回光返照
+      healthy_threshold: 2
+      # 使用TCP类型的状态检测
+      # 其中空配置表示空负载的tcp检测 表示仅通过连接和状态判定检测结果
+      # 可以认为是只发起TCP3握手 将握手建立的结果作为判断是否健康的依据
+      # 请求的端口就是endpoint.address.socket_address中指定的端口
+      tcp_health_check: {}
+      # 非空负载的TCP检测可以使用send和receive来分别指定
+      # 请求负荷 和 在响应报文中期望模糊匹配的结果
+      # tcp_health_check: {"send":"{}", "receive":[]}

@@ -1,0 +1,140 @@
+admin:
+  profile_path: /tmp/envoy.prof
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address:
+       address: 0.0.0.0
+       port_value: 9901
+
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address: { address: 0.0.0.0, port_value: 80 }
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: vh_001
+              # 定义了3个匹配规则:
+              # 精准匹配:ilinux.io
+              # 前缀匹配:*.ilinux.io
+              # 后缀匹配:ilinux.*
+              domains: ["ilinux.io", "*.ilinux.io", "ilinux.*"]
+              routes:
+              - match:
+                  # 若URL精确是 /service/blue
+                  # 则使用该路由
+                  path: "/service/blue"
+                route:
+                  # 即:将流量调度到名为blue的集群上
+                  cluster: blue
+              - match:
+                  # 正则匹配
+                  safe_regex: 
+                    # 模式遵循google_re2语法
+                    google_re2: {}
+                    # 匹配条件: 以/service/开头
+                    # 以blue结尾 中间可以是任何内容
+                    regex: "^/service/.*blue$"
+                # 重定向到/service/blue
+                # 即上一条路由
+                redirect:
+                  path_redirect: "/service/blue"
+              - match:
+                  # 若URL精确是 /service/yellow
+                  prefix: "/service/yellow"
+                # 直接由Envoy响应
+                direct_response:
+                  # 响应状态码
+                  status: 200
+                  # 响应体
+                  body:
+                    # 响应体中直接写内联字符串
+                    inline_string: "This page will be provided soon later.\n"
+              - match:
+                  # 以/为前缀
+                  prefix: "/"
+                route:
+                  # 将流量调度到名为red的集群
+                  cluster: red
+            - name: vh_002
+              # 此处的*类似于设置默认虚拟主机配置
+              # 即:没有匹配到任何虚拟主机时 使用该虚拟主机
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  # 将陆良调度到名为gray的集群
+                  cluster: gray
+          http_filters:
+          - name: envoy.filters.http.router
+
+  clusters:
+  - name: blue
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    http2_protocol_options: {}
+    load_assignment:
+      cluster_name: blue
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: blue
+                port_value: 80
+
+  - name: red
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    http2_protocol_options: {}
+    load_assignment:
+      cluster_name: red
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: red
+                port_value: 80
+
+  - name: green
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    http2_protocol_options: {}
+    load_assignment:
+      cluster_name: green
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: green
+                port_value: 80
+
+  - name: gray
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    http2_protocol_options: {}
+    load_assignment:
+      cluster_name: gray
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: gray
+                port_value: 80
+                

@@ -1,0 +1,40 @@
+listeners:
+- name:
+  address: {...}
+  filter_chians: []
+  - filters:
+    - name: envoy.filters.network.http_connection_manager
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+        stat_prefix: ingress_http
+        codec_type: AUTO
+        # RDS是从该字段开始动态发现的
+        route_config:
+          name: ...
+          virutal_hosts: []
+            # 虚拟主机名称 逻辑名称
+          - name: ...
+            # 虚拟主机的域名 
+            # 路由匹配时将请求报文中的host标头值与此处列表项进行匹配检测
+            domains: [] 
+            # 路由条目
+            # 匹配到当前虚拟主机的请求中的path匹配检测 将针对各route中由match定义条件进行
+            # 该字段只是表示开启路由配置段 真正指定路由目标的字段是routes.route
+            routes: [] 
+              # 路由的名称
+            - name: ...
+              # 常用内嵌字段 prefix|path|sate_regex|connect_matcher
+              # 用于定义基于路径前缀、路径、正则表达式或连接匹配器四者之一定义匹配条件
+              match: {...} 
+              # 常用内嵌字段cluster|cluster_header|weighted_clusters
+              # 基于集群、请求报文中的集群标头或加权集群(流量分割)定义路由目标
+              # 该字段真正指明了路由的目标
+              route: {...}
+              # 重定向请求 不可与route或direct_response一同使用
+              redirect: {...}
+              # 直接响应请求 不可与route和redirect一同使用
+              direct_response: {...} 
+            # 为此虚拟主机定义的用于收集统计信息的虚拟集群列表
+            virtual_clusters: [] 
+            ...
+          ...

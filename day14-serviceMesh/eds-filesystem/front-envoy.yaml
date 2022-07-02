@@ -1,0 +1,55 @@
+node:
+  # 若要使用动态配置 则每个Envoy实例必须有唯一的id标识
+  id: envoy_front_proxy
+  cluster: Roach_Cluster
+
+admin:
+  profile_path: /tmp/envoy.prof
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address:
+       address: 0.0.0.0
+       port_value: 9901
+
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address: { address: 0.0.0.0, port_value: 80 }
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: web_service_01
+              domains: ["*"]
+              routes:
+              - match: { prefix: "/" }
+                route: { cluster: webcluster }
+          http_filters:
+          - name: envoy.filters.http.router
+
+  clusters:
+    # 集群名称
+  - name: webcluster
+    connect_timeout: 0.25s
+    # 集群类型为EDS
+    type: EDS
+    lb_policy: ROUND_ROBIN
+    # 该字段相当于静态配置中的load_assignment字段
+    eds_cluster_config:
+      # 服务名称
+      service_name: webcluster
+      # EDS相关的配置 例如数据源的路径(地址)都在这里配置
+      eds_config:
+        # 指定订阅的文件路径 注意这个路径是指容器内的路径
+        # 而非宿主机的路径 因此在后续编写docker-compose文件时
+        # 要把对应的eds配置文件挂载到该路径下
+        # 注意:配置文件的后缀若为.conf 则资源要以JSON格式定义
+        # 配置文件的后缀若为.yaml 则资源要以yaml格式定义
+        path: '/etc/envoy/eds.conf.d/eds.yaml'

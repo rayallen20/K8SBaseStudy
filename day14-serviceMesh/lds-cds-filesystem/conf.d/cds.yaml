@@ -1,0 +1,21 @@
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: webcluster
+  connect_timeout: 1s
+  type: STRICT_DNS
+  load_assignment:
+    cluster_name: webcluster
+    endpoints:
+    - lb_endpoints:
+      - endpoint:
+          address:
+            socket_address:
+              # 此处的webserver01和webserver02是docker-compose.yaml
+              # 中定义的服务名 将服务名解析为IP地址是docker-compose提供的功能
+              address: webserver01
+              port_value: 80
+      - endpoint:
+          address:
+            socket_address:
+              address: webserver02
+              port_value: 80

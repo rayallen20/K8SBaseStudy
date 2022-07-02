@@ -1,0 +1,48 @@
+admin:
+  profile_path: /tmp/envoy.prof
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address: { address: 0.0.0.0, port_value: 9901 }
+
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address: { address: 0.0.0.0, port_value: 80 }
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: webservice
+              domains: ["*"]
+              routes:
+              - match: { prefix: "/" }
+                route: { cluster: web_cluster_01 }
+          http_filters:
+          - name: envoy.filters.http.router
+  clusters:
+  - name: web_cluster_01
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: web_cluster_01
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address: { address: myservice, port_value: 80 }
+    outlier_detection:
+      # 连续出现3次5XX错误则弹出
+      consecutive_5xx: 3
+      # 基准弹出时长10s 即:主机第1次弹出 处于弹出状态的时长为10s
+      # 第2次该主机被弹出时 处于弹出状态的时长为20s 以此类推
+      base_ejection_time: 10s
+      # 最大弹出比例为10%
+      max_ejection_percent: 10

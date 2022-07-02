@@ -1,0 +1,16 @@
+cluster:
+- name: ...
+  ...
+  common_lb_config:
+    # 启用位置加权负载均衡机制 它没有可用的子参数
+    # 但如果不启用该配置 则无法使用load_balancing_weight
+    # 因为该参数表示启用位置加权负载均衡机制
+    locality_weighted_lb_config: {} 
+  ...
+  load_assignment:
+    endpoints:
+      locality: "{...}"
+      lb_endpoints": []
+      # 整数值 定义当前位置或优先级的权重 最小值为1
+      load_balancing_weight: 1
+      priority: "..."

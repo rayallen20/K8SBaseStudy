@@ -1,0 +1,28 @@
+routes:
+- name: ...
+  match: {...}
+  # 路由目标 cluster和weighted_clusters只能使用其一
+  route: {...} 
+    cluster: 
+    # 子集负载均衡器使用的端点元数据匹配条件
+    # 若使用了weighted_clusters且内部定义了metadata_match
+    # 则元数据将被合并 且weighted_cluster中定义的值优先
+    # 过滤器名称应指定为envoy.lb
+    metadata_match: {...} 
+      # 元数据过滤器
+      filter_metadata: {...} 
+        envoy.lb: {...}
+          # 指定条件
+          key1: value1
+          key2: value2
+          ...
+    # 加权集群
+    # 该字段中可以定义多个集群
+    # 每个集群有自己的权重和选择器条件
+    # 流量按权重在多个集群间分配
+    # 此处的加权是为了做流量分割 调度中的加权是为了调度 目的是不同的
+    weighted_clusters: {...}
+      clusters: []
+      - name: ...
+        weight: ...
+        metadata_match: {...}

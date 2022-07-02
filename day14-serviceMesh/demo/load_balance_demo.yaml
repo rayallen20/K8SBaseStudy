@@ -1,0 +1,61 @@
+clusters:
+- name: ...
+  ...
+  load_assignment: {...}
+  cluster_name: ...
+  # LocalityLbEndpoints列表
+  # 每个列表项主要由位置、端点列表、权重和优先级四项组成
+  endpoints: []
+  # 集群的位置定义 本字段包含端点的定义
+  # 可以认为是将一个集群 根据位置划分为了不同的子集群
+  - locality: {...} 
+      region: ...
+      zone: ...
+      sub_zone: ...
+    # 端点列表
+    lb_endpoints: []
+    # 端点定义
+    - endpoint: {...}
+        # 端点地址
+        address: {...} 
+        # 当前端点与健康状态检查相关的配置
+        # 本字段中是每个端点对健康状态检测的独有配置
+        health_check_config: {...} 
+      # 当前端点的负载均衡权重 可选
+      load_balancing_weight: ... 
+      # 基于匹配的侦听器、过滤器链、路由和端点等为过滤器提供额外信息的元数据
+      # 常用用于提供服务配置或辅助负载均衡
+      metadata: {...} 
+      # 当端点是通过EDS发现时 
+      # 此配置项用于设定端点的健康状态
+      # 可用值有UNKOWN、HEALTHY、UNHEALTHY、DRAINING、TIMEOUT和DEGRADED
+      # 这个状态是人为定义的软状态
+      health_status: ... 
+    # 权重
+    load_balancing_weight: {...} 
+    # 优先级 表示的是一组端点的优先级
+    priority: ... 
+  # 负载均衡策略设定
+  policy: {...} 
+    # 过载保护机制 丢弃过载流量的机制
+    drop_overloads: [] 
+    # 整数值 定义超配因子(百分比)
+    # 默认值为140 即1.4
+    overprovisioning_factor: ... 
+    # 过期时长 过期之前未收到任何新流量分配的端点将被视为过时 并标记为不健康 
+    # 默认值0表示永不过时
+    endpoint_stale_after: ... 
+  # 针对特定算法的专用选项
+  lb_subset_config: {...}
+  ring_hash_lb_config: {...}
+  original_dst_lb_config: {...}
+  least_request_lb_config: {...}
+  common_lb_config: {...}
+    # # Panic阈值 默认为50%
+    health_panic_threshold: ... 
+    # 区域感知路由的相关配置
+    zone_aware_lb_config: {...} 
+    # 局部权重负载均衡相关的配置
+    locality_weighted_lb_config: {...} 
+    # 是否在新加入的主机经历第一次健康状态检查之前不予考虑进负载均衡
+    ignore_new_hosts_until_first_hc: ... 

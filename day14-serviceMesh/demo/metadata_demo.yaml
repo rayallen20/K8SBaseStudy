@@ -1,0 +1,19 @@
+load_assignment:
+  cluster_name: webcluster1
+  endpoints:
+  - lb_endpoints: 
+    - endpoint:
+      address:
+        socket_address:
+          protocol: TCP
+          address: ep1
+          port_value: 80
+      # 端点元数据字段
+      metadata:
+        # 过滤器元数据字段
+        filter_metadata:
+          # 指明过滤器名称为envoy.lb
+          # 即:该字段名就是过滤器名称
+          envoy.lb:
+            version: '1.0'
+            stage: 'prod'

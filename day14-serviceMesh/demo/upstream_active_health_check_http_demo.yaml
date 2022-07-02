@@ -1,0 +1,21 @@
+health_checks: []
+- ...
+  http_health_check:
+  # 检测时使用的主机标头 默认为空 这种情况下使用集群名称
+  # 1个endpoint上可能会有多个虚拟主机 因此需要指定虚拟主机
+  # 该配置项为必选配置 不写则使用集群名称
+  host: ... 
+  # 检测时使用的路径 该配置项为必选配置
+  path: ... 
+  # 用于验证检测目标集群服务名称的参数 该配置项为可选配置
+  # 端点虽然能够响应 但envoy期望来自端点的响应是指定的服务名称
+  # 此处的服务是通过服务发现总线发现的服务
+  # 对于Istio而言 通常指的就是底层的Kubernetes中的service资源名称
+  # 也就是该端点(Pod)所隶属的service的名称 此处写的名称必须与service的名称对应
+  service_name_matcher: ... 
+  # 向检测报文添加的自定义标头列表
+  request_headers_to_add: [] 
+  # 从检测报文中移除的标头列表
+  request_headers_to_remove: [] 
+  # 期望的响应码列表
+  expected_statuses: [] 

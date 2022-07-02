@@ -1,0 +1,66 @@
+node:
+  id: envoy_front_proxy
+  cluster: webcluster
+
+admin:
+  profile_path: /tmp/envoy.prof
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address:
+       address: 0.0.0.0
+       port_value: 9901
+
+# 配置的动态加载
+dynamic_resources:
+  # lds动态配置的配置项
+  # lds和xds分别要向不同的Management Server请求
+  # 因此需要分开定义 只是本例中二者请求的是同一个服务器
+  lds_config:
+    resource_api_version: V3
+    api_config_source:
+      # 传输方式为GRPC
+      api_type: GRPC
+      transport_api_version: V3
+      grpc_services:
+      - envoy_grpc:
+          # 该字段通过集群名称指定Management Server
+          cluster_name: xds_cluster
+  
+  # cds动态配置的配置项
+  cds_config:
+    resource_api_version: V3
+    api_config_source:
+      api_type: GRPC
+      transport_api_version: V3
+      grpc_services:
+      - envoy_grpc:
+          cluster_name: xds_cluster
+
+static_resources:
+  clusters:
+    # Management Server必须是静态定义的 因为无法动态发现Management Server
+  - name: xds_cluster
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    # The extension_protocol_options field is used to provide extension-specific protocol options for upstream connections. 
+    # 定义GRPC的工作属性
+    typed_extension_protocol_options:
+      # 使用v3版本API
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          # HTTP2协议的选项为空
+          http2_protocol_options: {}
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: xds_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                # 此处的地址写的是主机名 将主机名和IP地址做映射的DNS功能
+                # 由docker-compse实现 因此此处写的xdsserver 实际上就是
+                # docker-compose中定义的xdsserver容器的IP地址 即172.31.15.5
+                address: xdsserver
+                port_value: 18000

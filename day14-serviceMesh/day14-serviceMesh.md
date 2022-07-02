@@ -3045,7 +3045,7 @@ root@k8s-haproxy-2:~/health-check-with-http# docker-compose down
 
 异常探测定义示例:
 
-```
+```yaml
 clusters:
 - name: ...
   ...

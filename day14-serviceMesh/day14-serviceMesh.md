@@ -1562,6 +1562,9 @@ spec:
 ```
 root@k8s-haproxy-2:~/lds-cds-grpc/resources# vim config.yaml.v2
 root@k8s-haproxy-2:~/lds-cds-grpc/resources# cat config.yaml.v2
+```
+
+```yaml
 name: myconfig
 spec:
   listeners:

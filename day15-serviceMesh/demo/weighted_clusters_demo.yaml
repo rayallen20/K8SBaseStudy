@@ -1,0 +1,22 @@
+routes:
+- match: {...}
+  route:
+    weighted_clusters: {...} 
+      # 与当前路由关联的一个或多个集群 必选参数
+      clusters: []
+        # 目标集群名称
+        # 也可以使用 cluster_header 字段来指定集群 二者互斥；
+      - name: ...
+        # 集群权重 取值范围为0至total_weight
+        # 各集群权重之和需等于total_weight
+        weight: ... 
+        # 子集负载均衡器使用的端点元数据匹配条件 可选参数
+        # 仅用于上游集群中具有与此字段中设置的元数据匹配的元数端点以进行流量分配
+        metadata_match: {...} 
+      # 总权重值 默认为100 envoy中可以更改总权重值 但istio中不能更改
+      total_weight: ... 
+      # 可选参数 用于设定键前缀 
+      # 从而每个集群以 runtime_key_prefix+ . +cluster[i].name 为其键名
+      # 并能够以运行时键值的方式为每个集群提供权重 其中 cluster[i].name表示列表中第i个集群名称 
+      runtime_key_prefix: ... 
+...

@@ -1,0 +1,20 @@
+global:
+  scrape_interval:  15s
+  evaluation_interval:  15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+
+    # prometheus需要将statsd_exporter作为一个数据抓取目标
+  - job_name: 'statsd'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['statsd_exporter:9102']
+        labels:
+          group: 'services'

@@ -1,0 +1,27 @@
+filebeat.inputs:
+- type: log
+  paths: 
+    - '/logs/envoy/*access.log'
+
+# 拆分json中的message字段
+processors:
+- decode_json_fields:
+    fields: ["message"]
+    target: ""
+    overwrite_keys: true
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  indices:
+      # 此处将日志落盘到ES时 添加了一个前缀filebeat-日期
+    - index: "filebeat-%{+yyyy.MM.dd}"
+#    - index: "filebeat-%{[agent.version]}-%{+yyyy.MM.dd}"
+
+#output.console:
+#  enabled: true
+#  codec.json:
+#    pretty: true
+#    #escape_html: false
+
+logging.json: true
+logging.metrics.enabled: false

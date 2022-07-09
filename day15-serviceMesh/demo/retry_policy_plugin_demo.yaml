@@ -1,0 +1,13 @@
+retry_policy:
+  # 重试时选择主机的断言
+  retry_host_predicate: 
+    # 使用以前尝试过的主机 并拒绝本次重试时已经使用过的主机
+  - name: envoy.retry_host_predicates.previous_hosts
+  # 主机选择重试最大尝试次数
+  host_selection_retry_max_attempts: 3
+  retry_priority:
+    # 跟踪之前尝试的优先级
+    name: envoy.retry_priorities.previous_priorities
+    config:
+      # 优先级刷新的次数
+      update_frequency: 2

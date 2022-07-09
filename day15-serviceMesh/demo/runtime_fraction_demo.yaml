@@ -1,0 +1,26 @@
+routes:
+  # 定义路由匹配参数
+- match:
+  # 流量过滤条件 三者必须定义其中之一
+  prefix|path|regex: ... 
+  # 额外匹配指定的运行时键值
+  # 每次评估匹配路径时 它必需低于此字段指示的匹配百分比
+  # 支持渐进式修改
+  runtime_fraction:
+    # 运行时键值不可用时 则使用此默认值
+    default_value:
+      # 指定分子 默认为0
+      numerator: 
+      # 指定分母 小于分子时 最终百分比为1
+      # 分母固定使用HUNDRED(百 默认)、TEN_THOUSAND(万)和MILLION(百万)这3个值中的一个
+      denominator:
+    # 指定要使用的运行时键 其值需要用户自定义
+    runtime_key: routing.traffic_shift.KEY 
+  route:
+    custer: app1_v1
+  - match:
+    # 此处的匹配条件应该与前一个路由匹配条件相同 以确保能够分割流量
+    prefix|path|regex: ... 
+  route:
+    # 此处的集群通常是前一个路由中的目标集群应用程序的不同版本
+    cluster: app1_v2 

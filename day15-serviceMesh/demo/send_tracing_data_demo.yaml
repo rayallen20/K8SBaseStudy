@@ -1,0 +1,21 @@
+filter_chains: 
+- filters:
+  - name: envoy.http_connection_manager
+    stat_prefix: ...
+    route_config: {...}
+    tracing:
+      # 由客户端通过x-client-trace-id标头指定进行跟踪时的采样比例 即跟踪的请求比例 默认为100%
+      # 由于跟踪对系统性能是有一定影响的 所以该选项用于设定跟踪的比例
+      client_sampling: {...}
+      # 随机抽样 默认100%
+      random_sampling: {...}
+      # 整体抽样 默认100%
+      overall_sampling: {...} 
+      # 是否为span标注额外信息 设定为true时 则span将包含stream事件的日志信息
+      verbose: ... 
+      # 记录HTTP URL时使用的最大长度
+      max_path_tag_length: {...} 
+      # 自定义标签列表 各标签用于活动的span之上 且名称要唯一
+      custom_tags: []
+      # 指定要使用的外部tracing provider 即收集器的集群
+      provider: {...}

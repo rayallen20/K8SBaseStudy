@@ -1,0 +1,125 @@
+admin:
+  profile_path: /tmp/envoy.prof
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address:
+       address: 0.0.0.0
+       port_value: 9901
+
+layered_runtime:
+  layers:
+  - name: admin
+    admin_layer: {}
+       
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address: { address: 0.0.0.0, port_value: 80 }
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: backend
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/service/blue"
+                route:
+                  # 该集群的sidecar envoy注入了中断故障
+                  cluster: blue_abort
+                  retry_policy:
+                    # 重试条件 响应码为5xx
+                    retry_on: "5xx"
+                    # 重试次数 3次
+                    num_retries: 3                  
+              - match:
+                  prefix: "/service/red"
+                route:
+                  # 该集群的sidecar envoy注入了延迟故障
+                  cluster: red_delay
+                  # 设定一个短于延迟的时间 以便快速失败
+                  # 通常timeout就是用于快速失败的 因此一般设定的时长都会短于
+                  # 后端延迟故障的时长
+                  timeout: 1s
+              - match:
+                  prefix: "/service/green"
+                route:
+                  cluster: green
+              - match:
+                  prefix: "/service/colors"
+                route:
+                  # 把后端所有节点整合为一个集群来处理
+                  # 那么就意味着 请求有可能被中断 有可能超时 也有可能没有任何问题
+                  # 所以既有应对瞬态故障的重试 也有应对延迟的超时时长
+                  cluster: mycluster
+                  retry_policy:
+                    retry_on: "5xx"
+                    num_retries: 3                  
+                  timeout: 1s
+          http_filters:
+          - name: envoy.filters.http.router
+
+  clusters:
+  - name: red_delay
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: red_delay
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: service_red
+                port_value: 80
+
+  - name: blue_abort
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: blue_abort
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: service_blue
+                port_value: 80
+
+  - name: green
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: green
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: service_green
+                port_value: 80
+
+  - name: mycluster
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: mycluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: colored
+                port_value: 80

@@ -1,0 +1,24 @@
+filter_chains: 
+  - filters:
+    - name: envoy.filters.network.http_connection_manager
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+        stat_prefix: ingress_http
+        codec_type: AUTO
+        # 激活访问日志
+        access_log:
+          # 要实例化的访问日志实现的名称 该名称必须与静态注册的访问日志相匹配
+          # 和stats_sinks.name一样 不能随便写 只能写内置的日志实现的名称
+          # 当前的内置的日志记录器有
+          # envoy.access_loggers.file (常用)
+          # envoy.access_loggers.http_grpc
+          # envoy.access_loggers.open_telemetry
+          # envoy.access_loggers.stream
+          # envoy.access_loggers.tcp_grpc
+          # envoy.access_loggers.wasm
+          name: ...
+          # 用于确定输出哪些日志信息的过滤器 但仅能选择使用其中一种
+          filter: {...}
+          # 与选定的日志记录器类型相关的专用配置
+          # 不同的日志实现有不同的配置
+          typed_config: {...}

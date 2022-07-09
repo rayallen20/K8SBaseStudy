@@ -1,0 +1,21 @@
+route:
+  cluster|weighted_clusters:
+  ...
+  # 该字段用于定义对请求流量的镜像策略
+  request_mirror_policies: []
+  - cluster: ...
+    runtime_fraction: {...}
+      # 运行时键值不可用时 则使用此默认值
+      default_value: 
+        # 指定分子 默认为0
+        numerator: 
+        # 指定分母 小于分子时 最终百分比为1
+        # 分母固定使用HUNDRED（默认）、TEN_THOUSAND和MILLION
+        denominator: 
+      # 指定要使用的运行时键 其值需要用户自定义
+      # 该值用于指定向影子集群转发的流量的百分比
+      # 取值范围为0-10000 每个数字表示0.01%的请求比例 定义了此键却未指定其值是
+      # 默认为0
+      runtime_key: routing.request_mirror.KEY 
+  # 是否对trace span进行采样 默认为true
+  trace_sampled: {...} 

@@ -1,0 +1,24 @@
+stats_sinks:
+  # 要初始化的Sink的名称
+  # 名称必须匹配于Envoy内置支持的sink
+  # 包括 envoy.stat_sinks.dog_statsd
+  # envoy.stat_sinks.graphite_statsd
+  # envoy.stat_sinks.hystrix
+  # envoy.stat_sinks.metrics_service
+  # envoy.stat_sinks.statsd
+  # envoy.stat_sinks.wasm
+  # 它们的功用类似于Prometheus的exporter
+  name: ... 
+  # Sink的配置 各Sink的配置方式有所不同
+  # 下面给出的参数是为statd专用
+  typed_config: {...} 
+    # StatsdSink服务的访问端点 通常应该使用该字段
+    # 本字段用于指定统计数据的后端存储地址
+    # 也可以使用下面的tcp_cluster_name指定为配置在Envoy上的Sink服务器组成集群
+    address: {...}
+    # StatsdSink集群的名称 与address互斥
+    # StatsD所对应的后端存储 实际上也应该被定义为一个集群的格式
+    # 由StatsD将收集到的指标数据直接存入该集群
+    tcp_cluster_name: ... 
+    # StatsdSink自定义的数据前缀 可选参数
+    prefix: ... 

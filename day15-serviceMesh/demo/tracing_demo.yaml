@@ -1,0 +1,24 @@
+static_resources:
+  listeners:
+  - name: ...
+    address: {...}
+    filter_chains: 
+    - filters:
+      - name: envoy.http_connection_manager
+        stat_prefix: ...
+        route_config: {...}
+        # 表示激跟踪机制 生成span并向tracing provider(存储跟踪数据的集群)发送跟踪数据
+        tracing: {...} 
+      ...
+    ...
+clusters:
+  # 该集群用于存储跟踪数据
+- name: zipkin|jaeger|...
+...
+
+# Envoy使用的跟踪器的全局设定 主要用于配置tracing provider
+# 也可以在http_connection_manager过滤器上定义 在envoy v3的配置中
+# 更多的是使用在http_connection_manager过滤器上定义该字段的方式
+tracing: {...}
+  # HTTP跟踪器
+  http: {...}

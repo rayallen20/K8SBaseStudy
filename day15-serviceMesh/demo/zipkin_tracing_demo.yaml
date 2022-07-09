@@ -1,0 +1,30 @@
+tracing: 
+  # 指定跟踪http请求 因为目前只支持http请求
+  http:
+    # 类型化配置 支持的类型有
+    # envoy.tracers.datadog
+    # envoy.tracers.dynamic_ot
+    # envoy.tracers.lightstep
+    # envoy.tracers.opencensus
+    # envoy.tracers.skywalking
+    # envoy.tracers.xray
+    # envoy.tracers.zipkin(jaeger兼容) 即:类型化配置使用zipkin的配置 但后端存储系统为jaeger
+    name: ...
+    typed_config: 
+      # # 以zipkin为例 若使用jaeger 则为type.googleapis.com/envoy.config.trace.v3.JaegerConfig
+      “@type”: type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
+      # 指定承载Zipkin收集器的集群名称
+      # 该集群必须在Bootstrap静态集群资源中定义
+      collector_cluster: ...
+      # Zipkin服务的用于接收Span数据的API端点
+      # Zipkin的标准配置 其API端点为/api/v2/spans (不同版本API的接口路径不同)
+      collector_endpoint: ... 
+      # 是否创建128位的跟踪ID 默认为false 即使用64位的ID
+      trace_id_128bit: ...
+      # 客户端和服务器Span是否共享相同的span id 默认为true；
+      shared_span_context: ...
+      # Collocter端点的版本
+      collector_endpoint_version: ... 
+      # 向collector cluster发送span时使用的主机名 可选参数
+      # 默认为collector_cluster字段中定义的主机名
+      collector_hostname: ... 

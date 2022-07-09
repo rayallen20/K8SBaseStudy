@@ -1,0 +1,31 @@
+cors:
+  # 允许共享的资源列表 *表示所有
+  allow_origin: []
+  # 正则表达式模式表示的允许共享的资源
+  allow_origin_regex: [] 
+  # 允许资源访问时使用的HTTP方法列表
+  # 内容将被序列化到access-control-allow-methods标头
+  allow_methods: "..." 
+  # 允许在请求资源时使用HTTP标头列表 内容将被序列化到access-control-allow-headers标头
+  allow_headers: "..." 
+  # 浏览器可访问的HTTP标头白名单 内容将被序列化到access-control-expose-headers标头
+  expose_headers: "..." 
+  # 请求的缓存时长 内容将被序列化到access-control-max-age标头
+  max_age: "..." 
+  # 布尔型值 是否允许服务调用方法使用凭据发起实际请求
+  allow_credentials: {...} 
+  # 布尔型值 是否启用CORS 默认为启用 
+  # 此参数即将弃用 并由filter_enabled取代
+  enabled: {...} 
+  # 是否启用CORS过滤器 若启用
+  # 此处需要定义启用此过滤器的请求百分比 默认为100/HUNDRED
+  filter_enabled: "{...}" 
+  default_value:
+    numerator: ...
+    denominator: ...
+  runtime_key: ...
+  # 是否仅在阴影模式下启用过滤器的请求的百分比
+  # 若启用 其默认值为100/HUNDRED 它将评估请求的来源以确定其是否有效
+  # 但不强制执行任何策略 
+  # 若同时启用了filter_enabled和shadow_enabled 则filter_enabled标志优先
+  shadow_enabled: {...} 

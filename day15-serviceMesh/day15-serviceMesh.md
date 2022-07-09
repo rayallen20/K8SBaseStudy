@@ -4035,7 +4035,7 @@ root@k8s-haproxy-2:~/monitoring/service_a# vim main.go
 root@k8s-haproxy-2:~/monitoring/service_a# cat main.go
 ```
 
-```go
+```golang
 package main
 
 import (

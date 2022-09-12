@@ -797,7 +797,10 @@ kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future versi
 
 ```
 root@k8s-master-1:~/k8s-my-cluster-yaml/20220414# vim erp-nginx-svc.yaml
-root@k8s-master-1:~/k8s-my-cluster-yaml/20220414# cat erp-nginx-svc.yaml 
+root@k8s-master-1:~/k8s-my-cluster-yaml/20220414# cat erp-nginx-svc.yaml
+```
+
+```yaml 
 # 资源类型为service
 kind: Service
 # service API版本 使用kubectl explain service命令可以查询API版本信息

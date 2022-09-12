@@ -1232,7 +1232,7 @@ root@k8s-master-1:~/k8s-data/limit-case# vim case7-namespace-pod-limit-deploymen
 root@k8s-master-1:~/k8s-data/limit-case# cat case7-namespace-pod-limit-deployment.yaml
 ```
 
-```json
+```yaml
 kind: Deployment
 apiVersion: apps/v1
 metadata:
@@ -1265,9 +1265,15 @@ spec:
           requests:
             cpu: 500m
             memory: 512Mi
+```
+
+```
 root@k8s-master-1:~/k8s-data/limit-case# kubectl apply -f case7-namespace-pod-limit-deployment.yaml 
 deployment.apps/erp-pod-limit-deployment created
 root@k8s-master-1:~/k8s-data/limit-case# kubectl get deployment erp-pod-limit-deployment -n erp -o json
+```
+
+```json
 {
     "apiVersion": "apps/v1",
     "kind": "Deployment",

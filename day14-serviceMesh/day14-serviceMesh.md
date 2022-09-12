@@ -6047,18 +6047,18 @@ routes:
         metadata_match: {...}
 ```
 
-### 4.18 负载均衡器子集配置示例
+### 4.17 负载均衡器子集配置示例
 
-#### 4.18.1 环境说明
+#### 4.17.1 环境说明
 
 8个Service:
 
 - envoy:Front Proxy,地址为172.31.33.2
 - `[e1, e7]`:7个后端服务.每个后端主机的标签如4.16.2小节中的表格所示.此处为简化环境,没有给这7个后端服务配置sidecar proxy.而是直接在容器编排时以alias的方式配置了主机名,Front Proxy也是直接通过主机名解析的IP地址
 
-#### 4.18.2 容器编排
+#### 4.17.2 容器编排
 
-##### 4.18.2.1 编写front-envoy的配置文件
+##### 4.17.2.1 编写front-envoy的配置文件
 
 ```
 root@k8s-haproxy-2:~# mkdir lb-subsets
@@ -6301,7 +6301,7 @@ static_resources:
 	- 90%的流量由主机e1 e2 e5负责响应
 	- 10%的流量由主机主机e3 e4 e6负责响应
 
-##### 4.18.2.2 编写容器编排文件
+##### 4.17.2.2 编写容器编排文件
 
 ```
 root@k8s-haproxy-2:~/lb-subsets# vim docker-compose.yaml
@@ -6409,7 +6409,7 @@ networks:
         - subnet: 172.31.33.0/24
 ```
 
-##### 4.18.2.3 编写用于统计各个后端端点响应比例的脚本
+##### 4.17.2.3 编写用于统计各个后端端点响应比例的脚本
 
 ```
 root@k8s-haproxy-2:~/lb-subsets# vim test.sh
@@ -6439,9 +6439,9 @@ root@k8s-haproxy-2:~/lb-subsets# chmod a+x *.sh
 
 该脚本向front proxy发送200次请求,请求头中不携带任何自定义的字段,观察2个后端子集响应的比例
 
-#### 4.18.3 运行和测试
+#### 4.17.3 运行和测试
 
-##### 4.18.3.1 创建
+##### 4.17.3.1 创建
 
 ```
 root@k8s-haproxy-2:~/lb-subsets# docker-compose up
@@ -6459,7 +6459,7 @@ Attaching to lb-subsets-e1-1, lb-subsets-e2-1, lb-subsets-e3-1, lb-subsets-e4-1,
 ...
 ```
 
-##### 4.18.3.2 测试
+##### 4.17.3.2 测试
 
 - step1. 测试请求头中不携带任何自定义字段时的流量分配比例
 
@@ -6532,7 +6532,7 @@ ServerName: e7
 
 可以看到,流量由主机e7负责响应.因为该子集中只有e7这一个端点
 
-##### 4.18.3.3 停止
+##### 4.17.3.3 停止
 
 ```
 ^CGracefully stopping... (press Ctrl+C again to force)
@@ -6559,7 +6559,7 @@ root@k8s-haproxy-2:~/lb-subsets# docker-compose down
  ⠿ Network lb-subsets_envoymesh        Removed                                                                                                                                                                                                                             0.0s
 ```
 
-### 4.19 区域感知路由
+### 4.18 区域感知路由
 
 通常,始发集群和上游集群属于不同区域的部署中,Envoy执行区域感知路由.区域感知路由(zone aware routing)用于尽可能地向上游集群(此处的上游集群,不仅指front proxy外边的客户端,还指服务网格中发起请求的service.通常这种请求也是由该service的sidecar proxy负责发送的)中的本地区域发送流量,并大致确保将流量均衡分配至上游相关的所有端点;它依赖于以下几个先决条件:
 
@@ -6588,7 +6588,7 @@ common_lb_config:
   min_cluster_size: "{...}" 
 ```
 
-### 4.20 原始目标负载均衡
+### 4.19 原始目标负载均衡
 
 调度时,可用的目标上游主机范围将根据下游发出的请求连接上的元数据进行选定,并将请求调度至此范围内的某主机
 

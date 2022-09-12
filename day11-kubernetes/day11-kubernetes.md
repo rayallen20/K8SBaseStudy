@@ -1185,7 +1185,7 @@ root@k8s-master-1:~/k8s-data/limit-case# vim case7-namespace-pod-limit-deploymen
 root@k8s-master-1:~/k8s-data/limit-case# cat case7-namespace-pod-limit-deployment.yaml
 ```
 
-```
+```yaml
 kind: Deployment
 apiVersion: apps/v1
 metadata:
